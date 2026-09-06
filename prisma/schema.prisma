@@ -1,0 +1,169 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 6 conferences, 2 divisions each, 6 teams each = 72 teams. Static across all dynasties.
+model Conference {
+  id        String     @id @default(cuid())
+  code      String     @unique // SEC, B10, B12, PAC, ACC, BEC
+  name      String
+  divisions Division[]
+  teams     Team[]
+}
+
+model Division {
+  id           String     @id @default(cuid())
+  code         String     @unique // SECE, SECW, B10E, ...
+  name         String
+  conferenceId String
+  conference   Conference @relation(fields: [conferenceId], references: [id])
+  teams        Team[]
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  name           String   @unique // abbreviation used as display name, e.g. "ALA"
+  conferenceId   String
+  divisionId     String
+  historicScore  Float // fixed historical-strength input (TeamPlan.Score)
+  conference     Conference @relation(fields: [conferenceId], references: [id])
+  division       Division   @relation(fields: [divisionId], references: [id])
+  players        Player[]
+  teamSeasons    TeamSeason[]
+  awayGames      Game[]     @relation("AwayTeam")
+  homeGames      Game[]     @relation("HomeTeam")
+  movesFrom      RosterMove[] @relation("MoveFrom")
+  movesTo        RosterMove[] @relation("MoveTo")
+}
+
+model Dynasty {
+  id                 String   @id @default(cuid())
+  name               String
+  createdAt          DateTime @default(now())
+  currentSeasonNumber Int     @default(1)
+  players            Player[]
+  seasons            Season[]
+  rosterMoves        RosterMove[]
+}
+
+// posGroup: QB | UT | OL | DL | LB | DB
+// pos: specific position within group (e.g. UT -> RB/TE/WR)
+// side: O | D
+// classYear: FR | SO | JR | SR
+model Player {
+  id            String   @id @default(cuid())
+  dynastyId     String
+  teamId        String
+  name          String
+  posGroup      String
+  pos           String
+  side          String
+  classYear     String
+  ovr           Int
+  devTrait      Int // 1 bad, 2 normal, 3 star
+  devMarker     String // "-" | "" | "+" display flag, cosmetic
+  recruitedSeason Int
+  dynasty       Dynasty  @relation(fields: [dynastyId], references: [id])
+  team          Team     @relation(fields: [teamId], references: [id])
+
+  // Exactly one player per position group per team: QB, UT, OL, DL, LB, DB.
+  @@unique([dynastyId, teamId, posGroup])
+}
+
+// type: GRADUATED | EARLY_DEPARTURE | TRANSFER | FRESHMAN
+// One row per player who left a slot or arrived in one, for a given
+// offseason transition (seasonNumber = the season they're now ENTERING --
+// so a graduate leaving after season 3 to make room for season 4 is logged
+// with seasonNumber=4). fromTeamId is null for freshmen (came from high
+// school); toTeamId is null for graduations/early departures (left the sport).
+model RosterMove {
+  id           String   @id @default(cuid())
+  dynastyId    String
+  seasonNumber Int
+  type         String
+  posGroup     String
+  playerName   String
+  ovr          Int
+  devTrait     Int
+  fromTeamId   String?
+  toTeamId     String?
+  dynasty      Dynasty  @relation(fields: [dynastyId], references: [id])
+  fromTeam     Team?    @relation("MoveFrom", fields: [fromTeamId], references: [id])
+  toTeam       Team?    @relation("MoveTo", fields: [toTeamId], references: [id])
+}
+
+// status: SCHEDULED | IN_PROGRESS | POSTSEASON | COMPLETE
+model Season {
+  id          String       @id @default(cuid())
+  dynastyId   String
+  number      Int
+  status      String       @default("SCHEDULED")
+  currentWeek Int          @default(1)
+  dynasty     Dynasty      @relation(fields: [dynastyId], references: [id])
+  teamSeasons TeamSeason[]
+  games       Game[]
+
+  @@unique([dynastyId, number])
+}
+
+model TeamSeason {
+  id          String  @id @default(cuid())
+  seasonId    String
+  teamId      String
+  prestige    Float
+  offRating   Int
+  defRating   Int
+  totalRating Int
+  rating      Int
+  powerElo    Float
+  wins        Int     @default(0)
+  losses      Int     @default(0)
+  confWins    Int     @default(0)
+  confLosses  Int     @default(0)
+  rank        Int?
+  playoffSeed Int? // 1-6 once the playoff field is selected; null otherwise.
+  // Decided once (right after conference championships) and never recomputed --
+  // national rank keeps moving as later playoff/bowl games are played, so this
+  // must be persisted rather than re-derived from "current" standings.
+  season      Season  @relation(fields: [seasonId], references: [id])
+  team        Team    @relation(fields: [teamId], references: [id])
+
+  @@unique([seasonId, teamId])
+}
+
+// round: REGULAR | CONF_CHAMPIONSHIP | QUARTERFINAL | SEMIFINAL | FINAL | BOWL
+model Game {
+  id            String  @id @default(cuid())
+  seasonId      String
+  week          Int
+  round         String  @default("REGULAR")
+  bowlName      String? // set only when round = BOWL
+  neutralSite   Boolean @default(false) // true for every postseason game (no home-field edge)
+  awayTeamId    String
+  homeTeamId    String
+  awayScore     Int?
+  homeScore     Int?
+  otPeriods     Int     @default(0)
+  eloChangeAway Float?
+  eloChangeHome Float?
+  played        Boolean @default(false)
+  // National rank as of right before this game was simulated (null if
+  // unranked/untracked, e.g. the FCS team) -- snapshotted at simulation time
+  // since a team's live `rank` keeps moving in later weeks, so it can't be
+  // recovered afterward from current standings alone.
+  awayRankEntering Int?
+  homeRankEntering Int?
+  // Overall win-loss record immediately after this game's result was applied.
+  awayWinsAfter    Int?
+  awayLossesAfter  Int?
+  homeWinsAfter    Int?
+  homeLossesAfter  Int?
+  season        Season  @relation(fields: [seasonId], references: [id])
+  awayTeam      Team    @relation("AwayTeam", fields: [awayTeamId], references: [id])
+  homeTeam      Team    @relation("HomeTeam", fields: [homeTeamId], references: [id])
+}
