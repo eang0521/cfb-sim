@@ -48,6 +48,21 @@ export async function createDynasty(name: string) {
         recruitedSeason: p.recruitedSeason,
       })),
     });
+    await prisma.playerSeasonSnapshot.createMany({
+      data: roster.map((p) => ({
+        dynastyId: dynasty.id,
+        seasonNumber: 1,
+        teamId: team.id,
+        playerName: p.name,
+        posGroup: p.posGroup,
+        pos: p.pos,
+        side: p.side,
+        classYear: p.classYear,
+        ovr: p.ovr,
+        devTrait: p.devTrait,
+        devMarker: p.devMarker,
+      })),
+    });
 
     const prestige = scalePrestige(team.historicScore);
     const ratings = teamRatings(roster, prestige);

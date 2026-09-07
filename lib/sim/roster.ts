@@ -29,6 +29,16 @@ const POS_GROUP_META: Record<PosGroup, { side: Side }> = {
   DB: { side: "D" },
 };
 
+// The one true roster order, used everywhere a roster (or a list of players
+// spanning multiple position groups) is displayed.
+export const POS_GROUP_ORDER: PosGroup[] = ["QB", "UT", "OL", "DL", "LB", "DB"];
+
+export function sortByPosGroup<T extends { posGroup: string }>(players: T[]): T[] {
+  return players
+    .slice()
+    .sort((a, b) => POS_GROUP_ORDER.indexOf(a.posGroup as PosGroup) - POS_GROUP_ORDER.indexOf(b.posGroup as PosGroup));
+}
+
 // Sub-position weights within a group (not recoverable from the workbook's
 // formulas — they were random-assignment CHOOSE tables with no clean
 // pattern — supplied directly): UT is WR 1/2, RB 1/3, TE 1/6; OL is OT 1/2,

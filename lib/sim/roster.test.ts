@@ -7,6 +7,7 @@ import {
   isGraduating,
   rollDevTrait,
   rollEntersTransferPortal,
+  sortByPosGroup,
   teamRatings,
   walkDevTrait,
   type RosterPlayer,
@@ -138,6 +139,13 @@ describe("bootstrapInitialRoster", () => {
       for (const p of bootstrapInitialRoster(1, Math.random)) years.add(p.classYear);
     }
     expect(years.size).toBeGreaterThan(1);
+  });
+});
+
+describe("sortByPosGroup", () => {
+  it("always orders QB, UT, OL, DL, LB, DB regardless of input order", () => {
+    const shuffled = ["DB", "LB", "DL", "OL", "UT", "QB"].map((posGroup) => ({ posGroup }));
+    expect(sortByPosGroup(shuffled).map((p) => p.posGroup)).toEqual(["QB", "UT", "OL", "DL", "LB", "DB"]);
   });
 });
 

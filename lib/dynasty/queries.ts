@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { sortByPosGroup } from "@/lib/sim/roster";
 
 export interface StandingsSnapshot {
   rank: number | null;
@@ -70,18 +71,91 @@ export async function getAllGames(seasonId: string) {
 }
 
 export async function getTeamRoster(dynastyId: string, teamId: string) {
-  return prisma.player.findMany({
-    where: { dynastyId, teamId },
-    orderBy: [{ posGroup: "asc" }, { classYear: "asc" }, { ovr: "desc" }],
-  });
+  const players = await prisma.player.findMany({ where: { dynastyId, teamId } });
+  return sortByPosGroup(players);
 }
 
 // The offseason transaction log for the transition INTO `seasonNumber`
 // (i.e. everyone who left/arrived to produce that season's rosters).
 export async function getRosterMoves(dynastyId: string, seasonNumber: number) {
-  return prisma.rosterMove.findMany({
+  const moves = await prisma.rosterMove.findMany({
     where: { dynastyId, seasonNumber },
     include: { fromTeam: true, toTeam: true },
-    orderBy: [{ posGroup: "asc" }, { type: "asc" }, { ovr: "desc" }],
+    orderBy: [{ type: "asc" }, { ovr: "desc" }],
   });
+  return sortByPosGroup(moves);
+}
+
+// Every season a team has played in this dynasty, with its record and how
+// its postseason run ended (or "Missed Postseason" / "Season In Progress").
+export async function getTeamHistory(dynastyId: string, teamId: string) {
+  const seasons = await prisma.season.findMany({
+    where: { dynastyId },
+    orderBy: { number: "asc" },
+  });
+
+  const results = [];
+  for (const season of seasons) {
+    const teamSeason = await prisma.teamSeason.findUnique({
+      where: { seasonId_teamId: { seasonId: season.id, teamId } },
+    });
+    if (!teamSeason) continue; // team didn't exist yet in this season (shouldn't normally happen)
+
+    const hasSnapshot =
+      (await prisma.playerSeasonSnapshot.count({
+        where: { dynastyId, seasonNumber: season.number, teamId },
+      })) > 0;
+
+    results.push({
+      seasonNumber: season.number,
+      seasonStatus: season.status,
+      wins: teamSeason.wins,
+      losses: teamSeason.losses,
+      confWins: teamSeason.confWins,
+      confLosses: teamSeason.confLosses,
+      resultLabel: await getSeasonResultLabel(season.id, teamId, season.status),
+      hasRosterSnapshot: hasSnapshot,
+    });
+  }
+  return results;
+}
+
+async function getSeasonResultLabel(seasonId: string, teamId: string, seasonStatus: string): Promise<string> {
+  if (seasonStatus !== "COMPLETE") return "Season In Progress";
+
+  const postseasonGames = await prisma.game.findMany({
+    where: {
+      seasonId,
+      round: { not: "REGULAR" },
+      played: true,
+      OR: [{ awayTeamId: teamId }, { homeTeamId: teamId }],
+    },
+  });
+
+  const won = (g: (typeof postseasonGames)[number]) =>
+    g.awayTeamId === teamId ? g.awayScore! > g.homeScore! : g.homeScore! > g.awayScore!;
+
+  const final = postseasonGames.find((g) => g.round === "FINAL");
+  if (final) return won(final) ? "Won National Championship" : "Lost National Championship";
+
+  const semifinal = postseasonGames.find((g) => g.round === "SEMIFINAL");
+  if (semifinal) return "Lost Playoff Semis";
+
+  const quarterfinal = postseasonGames.find((g) => g.round === "QUARTERFINAL");
+  if (quarterfinal) return "Lost Playoff First Round";
+
+  const bowl = postseasonGames.find((g) => g.round === "BOWL");
+  if (bowl) return `${won(bowl) ? "Won" : "Lost"} ${bowl.bowlName}`;
+
+  const champ = postseasonGames.find((g) => g.round === "CONF_CHAMPIONSHIP");
+  if (champ) return won(champ) ? "Won Conference Championship" : "Lost Conference Championship";
+
+  return "Missed Postseason";
+}
+
+export async function getSeasonRosterSnapshot(dynastyId: string, teamId: string, seasonNumber: number) {
+  const players = await prisma.playerSeasonSnapshot.findMany({
+    where: { dynastyId, teamId, seasonNumber },
+  });
+  return sortByPosGroup(players);
 }

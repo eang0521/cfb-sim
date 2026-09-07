@@ -217,7 +217,8 @@ export async function runOffseason(dynastyId: string) {
     await prisma.rosterMove.createMany({ data: rosterMoveRows });
   }
 
-  // 4. Recompute each team's next-season ratings from their final roster.
+  // 4. Recompute each team's next-season ratings from their final roster,
+  // and freeze a snapshot of that roster for the team history page.
   for (const team of realTeams) {
     const finalPlayers = await prisma.player.findMany({ where: { dynastyId, teamId: team.id } });
     const roster = finalPlayers.map(toRosterPlayer);
@@ -234,6 +235,21 @@ export async function runOffseason(dynastyId: string) {
         rating: ratings.rating,
         powerElo: ratings.rating,
       },
+    });
+    await prisma.playerSeasonSnapshot.createMany({
+      data: roster.map((p) => ({
+        dynastyId,
+        seasonNumber: nextSeasonNumber,
+        teamId: team.id,
+        playerName: p.name,
+        posGroup: p.posGroup,
+        pos: p.pos,
+        side: p.side,
+        classYear: p.classYear,
+        ovr: p.ovr,
+        devTrait: p.devTrait,
+        devMarker: p.devMarker,
+      })),
     });
   }
 

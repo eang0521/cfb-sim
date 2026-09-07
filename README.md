@@ -63,6 +63,21 @@ None of this is in the original workbook (it modeled aging/graduation only) — 
 - The full transaction log — who left, who arrived, old school, new school — is on each season's
   **Offseason Report** page, backed by the `RosterMove` table.
 
+## Team history
+
+The **History** page (pick any team from the dropdown) lists every season it's played: record,
+conference record, and how its postseason ended (`Won National Championship`, `Lost Playoff
+First Round`, `Won Bill Bowl`, `Missed Postseason`, ...). Expand a season to see that season's
+6-man roster, frozen at the time via `PlayerSeasonSnapshot` — necessary because the live `Player`
+table only tracks 6 **slots** per team (one per position group) that get overwritten in place as
+players age, graduate, and get replaced, so it only ever reflects the *current* roster. Snapshots
+are taken at dynasty creation (season 1) and at the end of every offseason transition from then
+on; a dynasty's seasons played before this feature shipped have no snapshot and show a note
+instead of a roster.
+
+Rosters are always listed in position-group order — QB, UT, OL, DL, LB, DB — everywhere they
+appear on the site (`lib/sim/roster.ts#sortByPosGroup`).
+
 ## What's a faithful port vs. what's reimagined
 
 This started as a reverse-engineering exercise on the original spreadsheet's formulas. Where the

@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { getCurrentSeason, getTeamRoster } from "@/lib/dynasty/queries";
 
-const CLASS_ORDER: Record<string, number> = { FR: 0, SO: 1, JR: 2, SR: 3 };
-
 export default async function TeamPage({
   params,
 }: {
@@ -23,9 +21,7 @@ export default async function TeamPage({
   const teamSeason = await prisma.teamSeason.findUnique({
     where: { seasonId_teamId: { seasonId: season.id, teamId } },
   });
-  const roster = (await getTeamRoster(dynasty.id, teamId)).sort(
-    (a, b) => CLASS_ORDER[a.classYear] - CLASS_ORDER[b.classYear] || b.ovr - a.ovr
-  );
+  const roster = await getTeamRoster(dynasty.id, teamId);
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-16">

@@ -39,6 +39,7 @@ model Team {
   homeGames      Game[]     @relation("HomeTeam")
   movesFrom      RosterMove[] @relation("MoveFrom")
   movesTo        RosterMove[] @relation("MoveTo")
+  rosterSnapshots PlayerSeasonSnapshot[]
 }
 
 model Dynasty {
@@ -49,6 +50,7 @@ model Dynasty {
   players            Player[]
   seasons            Season[]
   rosterMoves        RosterMove[]
+  rosterSnapshots    PlayerSeasonSnapshot[]
 }
 
 // posGroup: QB | UT | OL | DL | LB | DB
@@ -73,6 +75,35 @@ model Player {
 
   // Exactly one player per position group per team: QB, UT, OL, DL, LB, DB.
   @@unique([dynastyId, teamId, posGroup])
+}
+
+// A frozen copy of a team's 6-man roster as it stood for a given season --
+// taken right when that season's Player rows are set (dynasty bootstrap for
+// season 1, end of the offseason transition for every season after). Needed
+// because Player rows are reused SLOTS (one per team+posGroup, see the
+// @@unique on Player below): a slot's contents get overwritten in place as
+// players age/leave/arrive, so the live Player table only ever reflects the
+// CURRENT season -- this table is what makes past seasons' rosters visible
+// on the team history page. Snapshots only exist from the season this
+// feature shipped in onward; earlier seasons in an existing dynasty predate
+// it and have no snapshot.
+model PlayerSeasonSnapshot {
+  id           String   @id @default(cuid())
+  dynastyId    String
+  seasonNumber Int
+  teamId       String
+  playerName   String
+  posGroup     String
+  pos          String
+  side         String
+  classYear    String
+  ovr          Int
+  devTrait     Int
+  devMarker    String
+  dynasty      Dynasty  @relation(fields: [dynastyId], references: [id])
+  team         Team     @relation(fields: [teamId], references: [id])
+
+  @@unique([dynastyId, seasonNumber, teamId, posGroup])
 }
 
 // type: GRADUATED | EARLY_DEPARTURE | TRANSFER | FRESHMAN
