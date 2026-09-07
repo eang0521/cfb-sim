@@ -8,9 +8,9 @@ import {
   getStandingsSnapshotMap,
   getWeekGames,
 } from "@/lib/dynasty/queries";
-import { simulateWeekAction, advancePostseasonAction, runOffseasonAction } from "@/app/actions";
 import { ROUND_LABEL } from "@/app/roundLabels";
 import { WeekGamesTable } from "@/app/components/WeekGamesTable";
+import { SimulationBar } from "@/app/components/SimulationBar";
 
 export default async function DynastyPage({
   params,
@@ -38,13 +38,8 @@ export default async function DynastyPage({
   const weekGames = await getWeekGames(season.id, viewedWeek);
   const standingsByTeamId = await getStandingsSnapshotMap(season.id);
 
-  const isViewingCurrentSimWeek = season.status === "IN_PROGRESS" && viewedWeek === season.currentWeek;
   const canGoPrev = viewedWeek > 1;
   const canGoNext = viewedWeek < maxWeek;
-
-  const simulateWeekWithIds = simulateWeekAction.bind(null, dynasty.id, season.id);
-  const advancePostseasonWithIds = advancePostseasonAction.bind(null, dynasty.id, season.id);
-  const runOffseasonWithId = runOffseasonAction.bind(null, dynasty.id);
 
   const weekLabel =
     viewedWeek <= 12
@@ -81,53 +76,38 @@ export default async function DynastyPage({
         </nav>
       </div>
 
+      <SimulationBar
+        dynastyId={dynasty.id}
+        seasonId={season.id}
+        seasonNumber={season.number}
+        status={season.status}
+        currentWeek={season.currentWeek}
+      />
+
       <section className="rounded border border-zinc-200 p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {canGoPrev ? (
-              <Link
-                href={`/dynasty/${dynasty.id}?week=${viewedWeek - 1}`}
-                className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
-                aria-label="Previous week"
-              >
-                &larr;
-              </Link>
-            ) : (
-              <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&larr;</span>
-            )}
-            <h2 className="font-semibold">{weekLabel}</h2>
-            {canGoNext ? (
-              <Link
-                href={`/dynasty/${dynasty.id}?week=${viewedWeek + 1}`}
-                className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
-                aria-label="Next week"
-              >
-                &rarr;
-              </Link>
-            ) : (
-              <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&rarr;</span>
-            )}
-          </div>
-          {isViewingCurrentSimWeek && (
-            <form action={simulateWeekWithIds}>
-              <button className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700">
-                Simulate Week {season.currentWeek}
-              </button>
-            </form>
+        <div className="mb-3 flex items-center gap-2">
+          {canGoPrev ? (
+            <Link
+              href={`/dynasty/${dynasty.id}?week=${viewedWeek - 1}`}
+              className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
+              aria-label="Previous week"
+            >
+              &larr;
+            </Link>
+          ) : (
+            <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&larr;</span>
           )}
-          {season.status === "POSTSEASON" && (
-            <form action={advancePostseasonWithIds}>
-              <button className="rounded bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-700">
-                Advance Postseason
-              </button>
-            </form>
-          )}
-          {season.status === "COMPLETE" && (
-            <form action={runOffseasonWithId}>
-              <button className="rounded bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-600">
-                Run Offseason &rarr; Season {season.number + 1}
-              </button>
-            </form>
+          <h2 className="font-semibold">{weekLabel}</h2>
+          {canGoNext ? (
+            <Link
+              href={`/dynasty/${dynasty.id}?week=${viewedWeek + 1}`}
+              className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
+              aria-label="Next week"
+            >
+              &rarr;
+            </Link>
+          ) : (
+            <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&rarr;</span>
           )}
         </div>
 
