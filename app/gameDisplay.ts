@@ -7,7 +7,7 @@
 
 import type { StandingsSnapshot } from "@/lib/dynasty/queries";
 
-export const RANKED_CUTOFF = 15;
+export const RANKED_CUTOFF = 25;
 
 export type { StandingsSnapshot };
 

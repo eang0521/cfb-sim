@@ -19,10 +19,10 @@ describe("gameSideDisplay", () => {
 });
 
 describe("formatRank", () => {
-  it("shows the rank only within the top 15", () => {
+  it("shows the rank only within the top 25", () => {
     expect(formatRank(1)).toBe("#1");
-    expect(formatRank(15)).toBe("#15");
-    expect(formatRank(16)).toBe("");
+    expect(formatRank(25)).toBe("#25");
+    expect(formatRank(26)).toBe("");
     expect(formatRank(null)).toBe("");
   });
 });

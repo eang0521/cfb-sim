@@ -25,7 +25,7 @@ export default async function DynastyPage({
   if (!dynasty || !season) notFound();
 
   const standings = await getStandings(season.id);
-  const top10 = standings.slice(0, 10);
+  const top25 = standings.slice(0, 25);
 
   const maxWeek = await getMaxScheduledWeek(season.id);
   let defaultWeek = season.currentWeek;
@@ -132,13 +132,13 @@ export default async function DynastyPage({
 
       <section>
         <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-semibold">Top 10</h2>
+          <h2 className="font-semibold">Top 25</h2>
           <Link href={`/dynasty/${dynasty.id}/standings`} className="text-sm text-zinc-500 hover:underline">
             Full standings &rarr;
           </Link>
         </div>
         <ol className="flex flex-col gap-1 text-sm">
-          {top10.map((ts, i) => (
+          {top25.map((ts, i) => (
             <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
               <span>
                 <span className="mr-2 tabular-nums text-zinc-400">{i + 1}.</span>
