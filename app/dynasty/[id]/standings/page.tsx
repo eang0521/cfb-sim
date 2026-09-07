@@ -46,26 +46,42 @@ export default async function StandingsPage({ params }: { params: Promise<{ id: 
         </ol>
       </section>
 
-      {[...byConference.entries()].map(([conf, teams]) => (
-        <section key={conf}>
-          <h2 className="mb-2 font-semibold">{conf}</h2>
-          <ul className="flex flex-col gap-1 text-sm">
-            {teams
-              .slice()
-              .sort((a, b) => b.confWins - b.confLosses - (a.confWins - a.confLosses))
-              .map((ts) => (
-                <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-                  <Link href={`/dynasty/${dynasty.id}/team/${ts.teamId}`} className="hover:underline">
-                    {ts.team.name}
-                  </Link>
-                  <span className="tabular-nums text-zinc-600">
-                    {ts.confWins}-{ts.confLosses} conf &middot; {ts.wins}-{ts.losses} overall
-                  </span>
-                </li>
+      {[...byConference.entries()].map(([conf, teams]) => {
+        const byDivision = new Map<string, typeof standings>();
+        for (const ts of teams) {
+          const code = ts.team.division.code;
+          if (!byDivision.has(code)) byDivision.set(code, []);
+          byDivision.get(code)!.push(ts);
+        }
+
+        return (
+          <section key={conf}>
+            <h2 className="mb-2 font-semibold">{conf}</h2>
+            <div className="flex flex-col gap-4">
+              {[...byDivision.entries()].map(([div, divTeams]) => (
+                <div key={div}>
+                  <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-zinc-400">{div}</h3>
+                  <ul className="flex flex-col gap-1 text-sm">
+                    {divTeams
+                      .slice()
+                      .sort((a, b) => b.confWins - b.confLosses - (a.confWins - a.confLosses))
+                      .map((ts) => (
+                        <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
+                          <Link href={`/dynasty/${dynasty.id}/team/${ts.teamId}`} className="hover:underline">
+                            {ts.team.name}
+                          </Link>
+                          <span className="tabular-nums text-zinc-600">
+                            {ts.confWins}-{ts.confLosses} conf &middot; {ts.wins}-{ts.losses} overall
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </div>
               ))}
-          </ul>
-        </section>
-      ))}
+            </div>
+          </section>
+        );
+      })}
     </main>
   );
 }

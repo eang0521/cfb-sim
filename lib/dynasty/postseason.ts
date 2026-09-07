@@ -187,19 +187,20 @@ async function simulateGames(
   games: { id: string; seasonId: string; awayTeamId: string; homeTeamId: string; neutralSite: boolean }[]
 ) {
   for (const game of games) {
-    const [away, home, awayTeam, homeTeam] = await Promise.all([
+    const [away, home] = await Promise.all([
       prisma.teamSeason.findUniqueOrThrow({
         where: { seasonId_teamId: { seasonId: game.seasonId, teamId: game.awayTeamId } },
       }),
       prisma.teamSeason.findUniqueOrThrow({
         where: { seasonId_teamId: { seasonId: game.seasonId, teamId: game.homeTeamId } },
       }),
-      prisma.team.findUniqueOrThrow({ where: { id: game.awayTeamId } }),
-      prisma.team.findUniqueOrThrow({ where: { id: game.homeTeamId } }),
     ]);
     const result = simulateGame(away, home, Math.random, game.neutralSite);
 
-    const isConferenceGame = awayTeam.conferenceId === homeTeam.conferenceId;
+    // Postseason games (conference championships, playoff rounds, bowls)
+    // never count toward a team's conference record, even when both sides
+    // are from the same conference.
+    const isConferenceGame = false;
     const awayWon = result.awayScore > result.homeScore;
     const awayRecord = await updateTeamRecord(game.seasonId, game.awayTeamId, awayWon, isConferenceGame, result.eloChangeAway);
     const homeRecord = await updateTeamRecord(game.seasonId, game.homeTeamId, !awayWon, isConferenceGame, result.eloChangeHome);
