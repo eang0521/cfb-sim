@@ -52,11 +52,7 @@ export default async function HistoryPage({
       />
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-semibold">
-          <Link href={`/dynasty/${dynasty.id}/team/${selectedTeam.id}`} className="hover:underline">
-            {selectedTeam.name}
-          </Link>
-        </h2>
+        <h2 className="font-semibold">{selectedTeam.name}</h2>
 
         {history.length === 0 ? (
           <p className="text-sm text-zinc-400">No seasons played yet.</p>
@@ -87,6 +83,9 @@ export default async function HistoryPage({
                       <span className="text-zinc-600">{h.resultLabel}</span>
                     </summary>
                     <div className="border-t border-zinc-200 px-3 py-2">
+                      <p className="mb-2 text-sm tabular-nums text-zinc-600">
+                        Offense {h.offRating} &middot; Defense {h.defRating}
+                      </p>
                       {rosterBySeasonNumber.has(h.seasonNumber) ? (
                         <table className="w-full text-left text-sm">
                           <thead className="text-xs uppercase text-zinc-500">

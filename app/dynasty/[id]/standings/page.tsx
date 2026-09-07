@@ -31,7 +31,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ id: 
             <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
               <span>
                 <span className="mr-2 w-6 tabular-nums text-zinc-400">{i + 1}.</span>
-                <Link href={`/dynasty/${dynasty.id}/team/${ts.teamId}`} className="hover:underline">
+                <Link href={`/dynasty/${dynasty.id}/history?team=${ts.teamId}`} className="hover:underline">
                   {ts.team.name}
                 </Link>
                 <span className="ml-2 text-xs text-zinc-500">
@@ -67,7 +67,7 @@ export default async function StandingsPage({ params }: { params: Promise<{ id: 
                       .sort((a, b) => b.confWins - b.confLosses - (a.confWins - a.confLosses))
                       .map((ts) => (
                         <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-                          <Link href={`/dynasty/${dynasty.id}/team/${ts.teamId}`} className="hover:underline">
+                          <Link href={`/dynasty/${dynasty.id}/history?team=${ts.teamId}`} className="hover:underline">
                             {ts.team.name}
                           </Link>
                           <span className="tabular-nums text-zinc-600">

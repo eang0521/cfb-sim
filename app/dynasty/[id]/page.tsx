@@ -145,7 +145,7 @@ export default async function DynastyPage({
             <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
               <span>
                 <span className="mr-2 tabular-nums text-zinc-400">{i + 1}.</span>
-                <Link href={`/dynasty/${dynasty.id}/team/${ts.teamId}`} className="hover:underline">
+                <Link href={`/dynasty/${dynasty.id}/history?team=${ts.teamId}`} className="hover:underline">
                   {ts.team.name}
                 </Link>
                 <span className="ml-2 text-xs text-zinc-500">{ts.team.conference.code}</span>

@@ -129,7 +129,7 @@ export function PlayerDatabaseTable({ players, dynastyId }: { players: PlayerDat
               <tr key={p.id} className="odd:bg-zinc-50">
                 <td className="py-1 pr-3">{p.name}</td>
                 <td className="py-1 pr-3">
-                  <Link href={`/dynasty/${dynastyId}/team/${p.teamId}`} className="hover:underline">
+                  <Link href={`/dynasty/${dynastyId}/history?team=${p.teamId}`} className="hover:underline">
                     {p.teamName}
                   </Link>
                 </td>

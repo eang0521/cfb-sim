@@ -72,7 +72,7 @@ export function WeekGamesTable({
               )}
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(away.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/game/${g.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/history?team=${g.awayTeam.id}`} className="hover:underline">
                   {g.awayTeam.name}
                 </Link>
               </td>
@@ -80,13 +80,15 @@ export function WeekGamesTable({
               <td className="py-1 pr-3 text-zinc-400">@</td>
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(home.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/game/${g.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/history?team=${g.homeTeam.id}`} className="hover:underline">
                   {g.homeTeam.name}
                 </Link>
               </td>
               <td className="py-1 pr-3 whitespace-nowrap tabular-nums text-zinc-500">{formatRecord(home)}</td>
               <td className="py-1 text-right tabular-nums text-zinc-600">
-                {g.played ? `${g.awayScore}-${g.homeScore}${g.otPeriods ? ` (${g.otPeriods}OT)` : ""}` : "—"}
+                <Link href={`/dynasty/${dynastyId}/game/${g.id}`} className="hover:underline">
+                  {g.played ? `${g.awayScore}-${g.homeScore}${g.otPeriods ? ` (${g.otPeriods}OT)` : ""}` : "—"}
+                </Link>
               </td>
             </tr>
           );
