@@ -62,18 +62,19 @@ export default async function HistoryPage({
           <p className="text-sm text-zinc-400">No seasons played yet.</p>
         ) : (
           <>
-            <div className="grid grid-cols-[80px_90px_60px_90px_1fr] gap-2 px-3 text-xs uppercase text-zinc-500">
+            <div className="grid grid-cols-[80px_90px_60px_90px_70px_1fr] gap-2 px-3 text-xs uppercase text-zinc-500">
               <span>Season</span>
               <span>Prestige</span>
               <span>Record</span>
               <span>Conf</span>
+              <span>Rank</span>
               <span>Result</span>
             </div>
             <ul className="flex flex-col gap-2">
               {history.map((h) => (
                 <li key={h.seasonNumber} className="rounded border border-zinc-200">
                   <details>
-                    <summary className="grid cursor-pointer grid-cols-[80px_90px_60px_90px_1fr] items-center gap-2 px-3 py-2 text-sm">
+                    <summary className="grid cursor-pointer grid-cols-[80px_90px_60px_90px_70px_1fr] items-center gap-2 px-3 py-2 text-sm">
                       <span className="font-medium">Season {h.seasonNumber}</span>
                       <span className="tabular-nums text-zinc-600">{h.startOfSeasonPrestige}</span>
                       <span className="tabular-nums text-zinc-600">
@@ -82,6 +83,7 @@ export default async function HistoryPage({
                       <span className="tabular-nums text-zinc-600">
                         {h.confWins}-{h.confLosses}
                       </span>
+                      <span className="tabular-nums text-zinc-600">{h.finalRank !== null ? `#${h.finalRank}` : "—"}</span>
                       <span className="text-zinc-600">{h.resultLabel}</span>
                     </summary>
                     <div className="border-t border-zinc-200 px-3 py-2">

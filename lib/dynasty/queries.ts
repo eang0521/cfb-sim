@@ -115,11 +115,29 @@ export async function getTeamHistory(dynastyId: string, teamId: string) {
       losses: teamSeason.losses,
       confWins: teamSeason.confWins,
       confLosses: teamSeason.confLosses,
+      finalRank: season.status === "COMPLETE" ? await getFinalRank(season.id, teamId) : null,
       resultLabel: await getSeasonResultLabel(season.id, teamId, season.status),
       hasRosterSnapshot: hasSnapshot,
     });
   }
   return results;
+}
+
+// A team's final national-power-rating rank once its season is COMPLETE.
+// Computed fresh from powerElo (rather than trusting the live `rank` field)
+// because `rank` is only ever recomputed through conference championships --
+// nothing re-ranks after the playoff/bowls, so a champion's `rank` field can
+// still read a pre-playoff number. powerElo itself keeps accumulating
+// through every postseason game, so it's already correct once COMPLETE.
+async function getFinalRank(seasonId: string, teamId: string): Promise<number | null> {
+  const teamSeasons = await prisma.teamSeason.findMany({
+    where: { seasonId },
+    include: { team: true },
+    orderBy: { powerElo: "desc" },
+  });
+  const realTeamSeasons = teamSeasons.filter((ts) => ts.team.name !== "FCS");
+  const index = realTeamSeasons.findIndex((ts) => ts.teamId === teamId);
+  return index === -1 ? null : index + 1;
 }
 
 async function getSeasonResultLabel(seasonId: string, teamId: string, seasonStatus: string): Promise<string> {
