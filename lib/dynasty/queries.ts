@@ -6,6 +6,7 @@ export interface StandingsSnapshot {
   rank: number | null;
   wins: number;
   losses: number;
+  powerElo: number;
 }
 
 export async function getCurrentSeason(dynastyId: string) {
@@ -30,7 +31,7 @@ export async function getStandings(seasonId: string) {
 // app/gameDisplay.ts).
 export async function getStandingsSnapshotMap(seasonId: string): Promise<Map<string, StandingsSnapshot>> {
   const standings = await getStandings(seasonId);
-  return new Map(standings.map((ts) => [ts.teamId, { rank: ts.rank, wins: ts.wins, losses: ts.losses }]));
+  return new Map(standings.map((ts) => [ts.teamId, { rank: ts.rank, wins: ts.wins, losses: ts.losses, powerElo: ts.powerElo }]));
 }
 
 export async function getWeekGames(seasonId: string, week: number) {

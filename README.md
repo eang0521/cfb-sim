@@ -132,7 +132,12 @@ formula survived, it's ported as directly as TypeScript allows:
 - `lib/sim/rng.ts` — the `CoinGeom` geometric-distribution lookup, the weighted-d6 possession
   count, and Excel's `BINOM.INV`.
 - `lib/sim/game.ts` — possession count → scoring-rate → binomial scores/FG-split → overtime
-  (with the real 3rd-OT two-point-conversion rule) → the Elo-style rating swing.
+  (with the real 3rd-OT two-point-conversion rule) → the Elo-style rating swing. The rating-swing
+  formula is computed from the away team's perspective for a real home/away game (`awayEloDelta`)
+  — faithfully ported as-is, road/home asymmetry and all (see the function's own doc comment) — but
+  every postseason game (conference championships, every playoff round, every bowl) is neutral-site,
+  where that asymmetry doesn't make sense, so those use a separate winner-perspective formula
+  (`neutralEloDelta`) with no baked-in home/road bonus at all.
 - `lib/sim/roster.ts` — HS recruit generation, the dev-trait roll, and the compounding
   growth-per-dev-trait formula used for aging. Confirmed against `S1Teams` directly: each team
   carries exactly 6 players (one per position group), not a full multi-year roster — a slot ages

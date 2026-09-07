@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { simulateGame } from "./game";
+import { awayEloDelta, neutralEloDelta, simulateGame } from "./game";
 
 describe("simulateGame", () => {
   it("produces realistic college-football score ranges over many sims", () => {
@@ -44,5 +44,35 @@ describe("simulateGame", () => {
     const a = { offRating: 50, defRating: 50 };
     const result = simulateGame(a, a, Math.random);
     expect(result.eloChangeAway).toBe(-result.eloChangeHome);
+  });
+
+  it("applies equal and opposite elo swings at a neutral site too", () => {
+    const a = { offRating: 50, defRating: 50 };
+    const result = simulateGame(a, a, Math.random, true);
+    expect(result.eloChangeAway).toBe(-result.eloChangeHome);
+  });
+});
+
+describe("neutralEloDelta", () => {
+  it("gives the SAME baseline swing for an away win and a home win of identical margin/offense gap", () => {
+    // awayEloDelta (real home/away) gives 16 for an away win and only 14 for
+    // an equivalent home win -- neutralEloDelta must not have that gap.
+    const awayWinDelta = neutralEloDelta(20, 15, 60, 50); // away wins by 5, +10 offense edge
+    const homeWinDelta = neutralEloDelta(15, 20, 50, 60); // home wins by 5, +10 offense edge (mirrored)
+    expect(awayWinDelta).toBe(16 + 1 + 1); // 1 + 15 + trunc(10/10) + trunc(5/5)
+    expect(homeWinDelta).toBe(-(16 + 1 + 1)); // home winning is the away side's LOSS, so negative
+  });
+
+  it("stays zero-sum", () => {
+    const delta = neutralEloDelta(24, 17, 55, 48);
+    expect(delta).toBe(-neutralEloDelta(17, 24, 48, 55));
+  });
+
+  it("differs from the real away/home formula's road-win bonus", () => {
+    // Same inputs, awayEloDelta gives the extra "win on the road" bump that
+    // neutralEloDelta must not.
+    const away = awayEloDelta(30, 20, 60, 50);
+    const neutral = neutralEloDelta(30, 20, 60, 50);
+    expect(neutral).not.toBe(away);
   });
 });

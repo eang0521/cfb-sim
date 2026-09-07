@@ -96,9 +96,24 @@ function simulateOt(awayRate: number, homeRate: number, rand: Rand): { away: num
 // than a win at home of the same margin/offense gap (and a loss at home
 // costs 2 fewer than the same loss on the road), and the offense-strength
 // term is always "home offense minus away offense" regardless of who wins.
-function awayEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
+export function awayEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
   const margin = awayScore - homeScore;
   return 1 + Math.sign(margin) * 15 + Math.trunc((homeOffense - awayOffense) / 10) + Math.trunc(margin / 5);
+}
+
+// Same formula, but evaluated from the WINNER's perspective instead of the
+// away team's, so a neutral-site game (conference championships, every
+// playoff round, every bowl) carries no home/away-shaped bonus at all --
+// there's no real home-field edge to reflect on a neutral field, so neither
+// side should get the away-formula's road-win bonus or take the (equally
+// arbitrary) home-loss discount.
+export function neutralEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
+  const margin = awayScore - homeScore;
+  const awayWon = margin > 0;
+  const winnerOffense = awayWon ? awayOffense : homeOffense;
+  const loserOffense = awayWon ? homeOffense : awayOffense;
+  const winnerDelta = 1 + 15 + Math.trunc((winnerOffense - loserOffense) / 10) + Math.trunc(Math.abs(margin) / 5);
+  return awayWon ? winnerDelta : -winnerDelta;
 }
 
 // Conference championships, playoff rounds, and bowls are all played at a
@@ -126,7 +141,9 @@ export function simulateGame(
     otPeriods = ot.periods;
   }
 
-  const eloChangeAway = awayEloDelta(awayScore, homeScore, away.offRating, home.offRating);
+  const eloChangeAway = neutralSite
+    ? neutralEloDelta(awayScore, homeScore, away.offRating, home.offRating)
+    : awayEloDelta(awayScore, homeScore, away.offRating, home.offRating);
   const eloChangeHome = -eloChangeAway;
 
   return { awayScore, homeScore, otPeriods, eloChangeAway, eloChangeHome };

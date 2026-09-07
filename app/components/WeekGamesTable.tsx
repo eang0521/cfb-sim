@@ -6,6 +6,7 @@ export interface WeekGamesTableGame {
   id: string;
   round: string;
   bowlName: string | null;
+  neutralSite: boolean;
   played: boolean;
   awayScore: number | null;
   homeScore: number | null;
@@ -36,8 +37,9 @@ export function WeekGamesTable({
   showBowlNames?: boolean;
 }) {
   // Sort by the best (lowest-numbered) visible rank in each matchup, so the
-  // marquee games surface first; games with no ranked team keep their
-  // original relative order at the bottom (a stable sort against Infinity).
+  // marquee games surface first; below that (or when neither team is
+  // ranked), sort by the best team's power rating instead of leaving
+  // unranked games in arbitrary order.
   const withDisplay = games.map((g) => {
     const away = gameSideDisplay(
       g.played,
@@ -55,9 +57,13 @@ export function WeekGamesTable({
     );
     const visibleRank = (rank: number | null) => (rank !== null && rank <= RANKED_CUTOFF ? rank : Infinity);
     const bestRank = Math.min(visibleRank(away.rank), visibleRank(home.rank));
-    return { game: g, away, home, bestRank };
+    const bestPowerElo = Math.max(
+      standingsByTeamId.get(g.awayTeam.id)?.powerElo ?? -Infinity,
+      standingsByTeamId.get(g.homeTeam.id)?.powerElo ?? -Infinity
+    );
+    return { game: g, away, home, bestRank, bestPowerElo };
   });
-  const sorted = withDisplay.slice().sort((a, b) => a.bestRank - b.bestRank);
+  const sorted = withDisplay.slice().sort((a, b) => a.bestRank - b.bestRank || b.bestPowerElo - a.bestPowerElo);
 
   return (
     <table className="w-full text-left text-sm">
@@ -77,7 +83,7 @@ export function WeekGamesTable({
                 </Link>
               </td>
               <td className="py-1 pr-3 whitespace-nowrap tabular-nums text-zinc-500">{formatRecord(away)}</td>
-              <td className="py-1 pr-3 text-zinc-400">@</td>
+              <td className="py-1 pr-3 text-zinc-400">{g.neutralSite ? "vs" : "@"}</td>
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(home.rank)}</td>
               <td className="py-1 pr-2">
                 <Link href={`/dynasty/${dynastyId}/history?team=${g.homeTeam.id}`} className="hover:underline">
