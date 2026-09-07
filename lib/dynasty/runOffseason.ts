@@ -9,10 +9,12 @@ import {
   type RosterPlayer,
 } from "@/lib/sim/roster";
 import { runPositionMarket, type TeamNeed, type TransferCandidate } from "@/lib/sim/recruiting";
-import { rankConferencesByWins, updatePrestige } from "@/lib/sim/prestige";
+import { CONFERENCE_RANK_BONUS_MEGA144, rankConferencesByWins, updatePrestige } from "@/lib/sim/prestige";
 import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
+import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
 import { recomputeRankings } from "./simulateWeek";
+import { buildSchedule144Input } from "./schedule144Data";
 
 const POS_GROUPS: PosGroup[] = ["QB", "UT", "OL", "DL", "LB", "DB"];
 
@@ -67,8 +69,9 @@ export async function runOffseason(dynastyId: string) {
     throw new Error("Season must be COMPLETE (regular season + postseason both played) before running the offseason.");
   }
 
-  const teams = await prisma.team.findMany({ include: { conference: true, division: true } });
-  const fcsTeam = await getOrCreateFcsTeam();
+  const ruleset = dynasty.ruleset;
+  const teams = await prisma.team.findMany({ where: { ruleset }, include: { conference: true, division: true } });
+  const fcsTeam = await getOrCreateFcsTeam(ruleset);
   const realTeams = teams.filter((t) => t.id !== fcsTeam.id);
 
   const teamSeasons = await prisma.teamSeason.findMany({ where: { seasonId: season.id } });
@@ -89,17 +92,22 @@ export async function runOffseason(dynastyId: string) {
   }
   const conferenceRanks = rankConferencesByWins(conferenceStats);
 
+  const conferenceRankBonusTable = ruleset === "MEGA144" ? CONFERENCE_RANK_BONUS_MEGA144 : undefined;
   const newPrestigeByTeamId = new Map<string, number>();
   for (const team of realTeams) {
     const teamSeason = teamSeasonByTeamId.get(team.id)!;
     newPrestigeByTeamId.set(
       team.id,
-      updatePrestige({
-        currentPrestige: teamSeason.prestige,
-        totalWins: teamSeason.wins,
-        totalLosses: teamSeason.losses,
-        conferenceRank: conferenceRanks[team.conferenceId],
-      })
+      updatePrestige(
+        {
+          currentPrestige: teamSeason.prestige,
+          totalWins: teamSeason.wins,
+          totalLosses: teamSeason.losses,
+          conferenceRank: conferenceRanks[team.conferenceId],
+        },
+        Math.random,
+        conferenceRankBonusTable
+      )
     );
   }
 
@@ -264,7 +272,15 @@ export async function runOffseason(dynastyId: string) {
     conferenceCode: t.conference.code,
     divisionCode: t.division.code,
   }));
-  const games = generateRegularSeasonSchedule(scheduleTeams, fcsTeam.id, nextSeasonNumber, priorStandings);
+  const games =
+    ruleset === "MEGA144"
+      ? generateRegularSeasonSchedule144(
+          scheduleTeams,
+          fcsTeam.id,
+          nextSeasonNumber,
+          await buildSchedule144Input(dynastyId, season.id, realTeams, newPrestigeByTeamId)
+        )
+      : generateRegularSeasonSchedule(scheduleTeams, fcsTeam.id, nextSeasonNumber, priorStandings);
   await prisma.game.createMany({
     data: games.map((g) => ({
       seasonId: nextSeason.id,

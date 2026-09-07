@@ -8,22 +8,24 @@ const FCS_DIVISION_CODE = "INDD";
 // A single synthetic "FCS" opponent, reused by every team's cupcake game each
 // season. Unlike a real team it isn't degree-limited to one game/week — many
 // teams can each play "the FCS team" in the same week, matching how the
-// workbook's `J2='FCS'` non-conference filler games worked.
-export async function getOrCreateFcsTeam() {
+// workbook's `J2='FCS'` non-conference filler games worked. Each ruleset gets
+// its own FCS team (Team.name is only unique WITHIN a ruleset).
+export async function getOrCreateFcsTeam(ruleset: string) {
   const conference = await prisma.conference.upsert({
-    where: { code: FCS_CONFERENCE_CODE },
+    where: { ruleset_code: { ruleset, code: FCS_CONFERENCE_CODE } },
     update: {},
-    create: { code: FCS_CONFERENCE_CODE, name: "Independents" },
+    create: { ruleset, code: FCS_CONFERENCE_CODE, name: "Independents" },
   });
   const division = await prisma.division.upsert({
-    where: { code: FCS_DIVISION_CODE },
+    where: { ruleset_code: { ruleset, code: FCS_DIVISION_CODE } },
     update: {},
-    create: { code: FCS_DIVISION_CODE, name: "FCS", conferenceId: conference.id },
+    create: { ruleset, code: FCS_DIVISION_CODE, name: "FCS", conferenceId: conference.id },
   });
   return prisma.team.upsert({
-    where: { name: FCS_TEAM_NAME },
+    where: { ruleset_name: { ruleset, name: FCS_TEAM_NAME } },
     update: {},
     create: {
+      ruleset,
       name: FCS_TEAM_NAME,
       historicScore: 0,
       conferenceId: conference.id,

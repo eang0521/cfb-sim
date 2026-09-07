@@ -18,7 +18,7 @@ export default async function HistoryPage({
   if (!dynasty) notFound();
 
   const teams = await prisma.team.findMany({
-    where: { name: { not: FCS_TEAM_NAME } },
+    where: { ruleset: dynasty.ruleset, name: { not: FCS_TEAM_NAME } },
     include: { conference: true },
     orderBy: { name: "asc" },
   });

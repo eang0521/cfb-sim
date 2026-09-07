@@ -4,17 +4,21 @@ A web port of a 72-team, 6-conference college football dynasty simulator origina
 41-sheet Excel/Google-Sheets workbook. Full dynasty mode: simulate a season week by week, run a
 6-team playoff, then roll into an offseason (aging, recruiting, prestige shifts) and repeat.
 
+A second, larger **ruleset** is also available when creating a dynasty: **MEGA144** (144 teams,
+12 conferences, a 12-team playoff) -- see "The MEGA144 ruleset" below. Every dynasty picks one
+ruleset at creation and stays on it; the two never mix.
+
 ## Getting started
 
 ```bash
 npm install
 cp .env.example .env
 npm run db:push    # creates prisma/dev.db from the schema
-npm run db:seed    # seeds the 6 conferences / 12 divisions / 72 teams
+npm run db:seed    # seeds both rulesets: 6 conf / 12 div / 72 teams (CLASSIC) + 12 conf / 24 div / 144 teams (MEGA144)
 npm run dev
 ```
 
-Open http://localhost:3000, start a dynasty, and simulate.
+Open http://localhost:3000, start a dynasty (pick a ruleset), and simulate.
 
 Run the simulation engine's unit tests with `npm test`.
 
@@ -77,6 +81,39 @@ instead of a roster.
 
 Rosters are always listed in position-group order — QB, UT, OL, DL, LB, DB — everywhere they
 appear on the site (`lib/sim/roster.ts#sortByPosGroup`).
+
+## The MEGA144 ruleset
+
+Entirely invented for the app -- no spreadsheet ever modeled a league this size. 144 teams, 12
+conferences (`lib/data/teams144.ts`), same 2-divisions-of-6 shape as CLASSIC per conference.
+`Conference`/`Division`/`Team` all carry a `ruleset` column now (`CLASSIC` | `MEGA144`) since the
+two datasets reuse some of the same codes/abbreviations (e.g. both have a "B12" and an "ALA") --
+every dynasty is created under one ruleset and only ever sees that ruleset's teams.
+
+- **Prestige** is given directly per team (no `historicScore`-style scaling), and the end-of-season
+  conference-rank bonus is `[+3,+2,+2,+1,+1,0,0,-1,-1,-2,-2,-3]` across the 12 conferences.
+- **Regular season** (`lib/sim/schedule144.ts`): weeks 4/6/8/10/12 are the division round robin,
+  weeks 7/9/11 are non-division conference games (3 of the 6 possible cross-division opponents,
+  alternating to the other 3 every year). Every team gets **exactly** 4 home / 4 away across
+  those 8 games, every season, guaranteed by an Eulerian-circuit graph orientation
+  (`lib/sim/eulerianCircuit.ts` -- a graph where every vertex has even degree always admits an
+  orientation with equal in/out degree at each vertex; walking an Eulerian circuit and orienting
+  along the walk is the classical construction). Host alternation for a repeat pairing is applied
+  on top as a *best-effort* bias sourced from this dynasty's actual game history -- the exact 4-4
+  split always wins if the two ever conflict.
+- **Weeks 1/3/5** are a cross-conference block schedule: the 12 conferences are shuffled into a
+  fresh order every season, Week 1 pairs them (1v2, 3v4, ..., 11v12) and Week 3 shifts the pairing
+  by one (2v3, 4v5, ..., 12v1) -- between the two, every conference hosts exactly once and travels
+  exactly once. Within each pairing, teams are matched by rank within their own conference (last
+  season's conference record, tiebroken by head-to-head then power rating; starting Prestige for
+  season 1). Week 5 ranks conferences by this season's average Prestige and greedily pairs them
+  avoiding a repeat of the week 1/3 matchup, hosted by whichever conference has hosted fewer week-5
+  games across the dynasty's history (tie -> random).
+- **Postseason**: a 12-team playoff, top 6 conference champions by national rank auto-bid (scales
+  CLASSIC's top-3-of-6 rule, matching the real CFP's current format). Seeds 1-4 bye; first round is
+  5v12/6v11/7v10/8v9; a fixed bracket (no reseeding) sends the winners to seeds 1-4 in the
+  quarterfinals. `lib/data/bowls144.ts` has its own ~55 named non-playoff bowl tie-ins, roughly
+  double CLASSIC's set.
 
 ## What's a faithful port vs. what's reimagined
 

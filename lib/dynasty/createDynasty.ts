@@ -1,28 +1,35 @@
 import { prisma } from "@/lib/db/client";
 import { bootstrapInitialRoster, teamRatings } from "@/lib/sim/roster";
 import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
+import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
 import { recomputeRankings } from "./simulateWeek";
 
-export async function createDynasty(name: string) {
-  const teams = await prisma.team.findMany({ include: { conference: true, division: true } });
-  const fcsTeam = await getOrCreateFcsTeam();
+export type Ruleset = "CLASSIC" | "MEGA144";
+
+export async function createDynasty(name: string, ruleset: Ruleset = "CLASSIC") {
+  const teams = await prisma.team.findMany({ where: { ruleset }, include: { conference: true, division: true } });
+  const fcsTeam = await getOrCreateFcsTeam(ruleset);
 
   const dynasty = await prisma.dynasty.create({
-    data: { name, currentSeasonNumber: 1 },
+    data: { name, ruleset, currentSeasonNumber: 1 },
   });
 
   const season = await prisma.season.create({
     data: { dynastyId: dynasty.id, number: 1, status: "IN_PROGRESS", currentWeek: 1 },
   });
 
-  // No real "prior season" yet -- seed the rank-based non-conference games
-  // off each team's initial (historical-strength-derived) prestige order
-  // within its own conference.
   const realTeams = teams.filter((t) => t.id !== fcsTeam.id);
+
+  // No real "prior season" yet -- seed the rank-based non-conference games
+  // off each team's initial (historical-strength-derived, or given-directly
+  // for MEGA144) prestige order within its own conference.
+  const startingPrestigeByTeamId = new Map<string, number>(
+    realTeams.map((t) => [t.id, ruleset === "MEGA144" ? (t.startingPrestige ?? 0) : scalePrestige(t.historicScore ?? 0)])
+  );
   const priorStandings: PriorStanding[] = Object.values(
     realTeams.reduce<Record<string, { teamId: string; prestige: number }[]>>((acc, t) => {
-      (acc[t.conferenceId] ??= []).push({ teamId: t.id, prestige: scalePrestige(t.historicScore) });
+      (acc[t.conferenceId] ??= []).push({ teamId: t.id, prestige: startingPrestigeByTeamId.get(t.id)! });
       return acc;
     }, {})
   ).flatMap((confTeams) =>
@@ -64,7 +71,12 @@ export async function createDynasty(name: string) {
       })),
     });
 
-    const prestige = scalePrestige(team.historicScore);
+    const prestige =
+      team.id === fcsTeam.id
+        ? 0
+        : ruleset === "MEGA144"
+          ? (team.startingPrestige ?? 0)
+          : scalePrestige(team.historicScore ?? 0);
     const ratings = teamRatings(roster, prestige);
     await prisma.teamSeason.create({
       data: {
@@ -91,7 +103,19 @@ export async function createDynasty(name: string) {
     conferenceCode: t.conference.code,
     divisionCode: t.division.code,
   }));
-  const games = generateRegularSeasonSchedule(scheduleTeams, fcsTeam.id, 1, priorStandings);
+
+  const games =
+    ruleset === "MEGA144"
+      ? generateRegularSeasonSchedule144(scheduleTeams, fcsTeam.id, 1, {
+          priorConfRecord: new Map(),
+          priorHeadToHead: new Map(),
+          startingPrestige: startingPrestigeByTeamId,
+          currentSeasonPrestige: startingPrestigeByTeamId,
+          priorMeetingHost: new Map(),
+          week5HistoricalHostCounts: new Map(),
+        })
+      : generateRegularSeasonSchedule(scheduleTeams, fcsTeam.id, 1, priorStandings);
+
   await prisma.game.createMany({
     data: games.map((g) => ({
       seasonId: season.id,
@@ -107,7 +131,7 @@ export async function createDynasty(name: string) {
 // The workbook's historical `Score` inputs run ~2,000-50,000; the in-sim
 // Prestige stat that actually feeds Rating is a small integer (~-15 to +30,
 // see S2Teams.F). Map the historical score onto that scale for a new
-// dynasty's day-1 prestige.
+// dynasty's day-1 prestige. CLASSIC only -- MEGA144 gives Prestige directly.
 export function scalePrestige(historicScore: number): number {
   return Math.round((historicScore - 20000) / 1200);
 }

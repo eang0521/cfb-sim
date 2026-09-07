@@ -17,30 +17,37 @@
 import { randBetween, type Rand } from "./rng";
 
 const RANDOM_SWING = [-3, -2, -1, 1, 2, 3];
-const CONFERENCE_RANK_BONUS = [2, 1, 0, 0, -1, -2]; // index 0 = best conference that season
+// index 0 = best conference that season. CLASSIC: 6 conferences. MEGA144: 12
+// conferences, given directly by the user.
+export const CONFERENCE_RANK_BONUS = [2, 1, 0, 0, -1, -2];
+export const CONFERENCE_RANK_BONUS_MEGA144 = [3, 2, 2, 1, 1, 0, 0, -1, -1, -2, -2, -3];
 
 export interface PrestigeUpdateInput {
   currentPrestige: number;
   totalWins: number;
   totalLosses: number;
-  conferenceRank: number; // 1-6, 1 = best conference that season
+  conferenceRank: number; // 1 = best conference that season
 }
 
 export function randomPrestigeSwing(rand: Rand = Math.random): number {
   return RANDOM_SWING[randBetween(0, RANDOM_SWING.length - 1, rand)];
 }
 
-export function conferenceRankBonus(conferenceRank: number): number {
-  return CONFERENCE_RANK_BONUS[Math.min(Math.max(conferenceRank, 1), 6) - 1];
+export function conferenceRankBonus(conferenceRank: number, bonusTable: number[] = CONFERENCE_RANK_BONUS): number {
+  return bonusTable[Math.min(Math.max(conferenceRank, 1), bonusTable.length) - 1];
 }
 
-export function updatePrestige(input: PrestigeUpdateInput, rand: Rand = Math.random): number {
+export function updatePrestige(
+  input: PrestigeUpdateInput,
+  rand: Rand = Math.random,
+  bonusTable: number[] = CONFERENCE_RANK_BONUS
+): number {
   const decayed = Math.round((input.currentPrestige * 2) / 3);
   return (
     decayed +
     input.totalWins -
     input.totalLosses +
-    conferenceRankBonus(input.conferenceRank) +
+    conferenceRankBonus(input.conferenceRank, bonusTable) +
     randomPrestigeSwing(rand)
   );
 }

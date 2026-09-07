@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
-import { createDynasty } from "@/lib/dynasty/createDynasty";
+import { createDynasty, type Ruleset } from "@/lib/dynasty/createDynasty";
 import { simulateWeek } from "@/lib/dynasty/simulateWeek";
 import { advancePostseason } from "@/lib/dynasty/postseason";
 import { runOffseason } from "@/lib/dynasty/runOffseason";
@@ -17,7 +17,9 @@ import {
 export async function createDynastyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Dynasty name is required.");
-  const dynasty = await createDynasty(name);
+  const rulesetInput = String(formData.get("ruleset") ?? "CLASSIC");
+  const ruleset: Ruleset = rulesetInput === "MEGA144" ? "MEGA144" : "CLASSIC";
+  const dynasty = await createDynasty(name, ruleset);
   redirect(`/dynasty/${dynasty.id}`);
 }
 
@@ -34,6 +36,7 @@ export async function simulateWeekAction(dynastyId: string, seasonId: string) {
 
 const POSTSEASON_ROUND_WEEK: Record<string, number> = {
   CONF_CHAMPIONSHIP: 13,
+  FIRST_ROUND: 14, // MEGA144 only
   QUARTERFINAL: 15,
   SEMIFINAL: 16,
   FINAL: 17,

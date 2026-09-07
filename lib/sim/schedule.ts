@@ -48,17 +48,17 @@ export interface ScheduledGame {
   homeTeamId: string;
 }
 
-function mod(n: number, m: number): number {
+export function mod(n: number, m: number): number {
   return ((n % m) + m) % m;
 }
 
-function byName(a: ScheduleTeam, b: ScheduleTeam): number {
+export function byName(a: ScheduleTeam, b: ScheduleTeam): number {
   return a.name.localeCompare(b.name);
 }
 
 // Round-robin "circle method": for `m` teams (m even), returns `m-1` rounds,
 // each a perfect matching, with every pair of teams meeting exactly once.
-function circleRoundRobin<T>(teams: T[]): T[][][] {
+export function circleRoundRobin<T>(teams: T[]): T[][][] {
   const m = teams.length;
   const rounds: T[][][] = [];
   let arr = teams.slice();
@@ -78,7 +78,7 @@ function circleRoundRobin<T>(teams: T[]): T[][][] {
 
 // Bipartite round-robin: two equal-size pools, `m` rounds pairing every
 // A-team with every B-team exactly once.
-function bipartiteRoundRobin<T>(poolA: T[], poolB: T[]): T[][][] {
+export function bipartiteRoundRobin<T>(poolA: T[], poolB: T[]): T[][][] {
   const m = poolA.length;
   const rounds: T[][][] = [];
   for (let r = 0; r < m; r++) {
@@ -100,7 +100,7 @@ interface FixedPartners {
   nonConfRival: FixedOpponent; // R
 }
 
-function isPrimary(a: ScheduleTeam, b: ScheduleTeam): boolean {
+export function isPrimary(a: ScheduleTeam, b: ScheduleTeam): boolean {
   return byName(a, b) < 0;
 }
 

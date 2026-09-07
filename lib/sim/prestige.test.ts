@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { conferenceRankBonus, rankConferencesByWins, updatePrestige } from "./prestige";
+import { CONFERENCE_RANK_BONUS_MEGA144, conferenceRankBonus, rankConferencesByWins, updatePrestige } from "./prestige";
 
 function seeded(sequence: number[]): () => number {
   let i = 0;
@@ -31,7 +31,14 @@ describe("updatePrestige", () => {
 
 describe("conferenceRankBonus", () => {
   it("matches [+2,+1,0,0,-1,-2] for ranks 1-6", () => {
-    expect([1, 2, 3, 4, 5, 6].map(conferenceRankBonus)).toEqual([2, 1, 0, 0, -1, -2]);
+    expect([1, 2, 3, 4, 5, 6].map((rank) => conferenceRankBonus(rank))).toEqual([2, 1, 0, 0, -1, -2]);
+  });
+
+  it("matches the MEGA144 [+3,+2,+2,+1,+1,0,0,-1,-1,-2,-2,-3] table for ranks 1-12", () => {
+    const ranks = Array.from({ length: 12 }, (_, i) => i + 1);
+    expect(ranks.map((rank) => conferenceRankBonus(rank, CONFERENCE_RANK_BONUS_MEGA144))).toEqual([
+      3, 2, 2, 1, 1, 0, 0, -1, -1, -2, -2, -3,
+    ]);
   });
 });
 

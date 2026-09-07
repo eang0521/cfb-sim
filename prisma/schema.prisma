@@ -7,30 +7,44 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// 6 conferences, 2 divisions each, 6 teams each = 72 teams. Static across all dynasties.
+// ruleset: CLASSIC (72 teams / 6 conferences, the original port) | MEGA144 (144
+// teams / 12 conferences). Conference/Division/Team are shared reference data
+// across every dynasty of a given ruleset, so names/codes only need to be
+// unique WITHIN a ruleset -- both datasets happen to reuse some of the same
+// conference codes (e.g. "B12") and team abbreviations (e.g. "ALA").
 model Conference {
   id        String     @id @default(cuid())
-  code      String     @unique // SEC, B10, B12, PAC, ACC, BEC
+  ruleset   String     @default("CLASSIC")
+  code      String     // SEC, B10, B12, PAC, ACC, BEC (CLASSIC) / SEC, B1G, P12, ... (MEGA144)
   name      String
   divisions Division[]
   teams     Team[]
+
+  @@unique([ruleset, code])
 }
 
 model Division {
   id           String     @id @default(cuid())
-  code         String     @unique // SECE, SECW, B10E, ...
+  ruleset      String     @default("CLASSIC")
+  code         String     // SECE, SECW, B10E, ...
   name         String
   conferenceId String
   conference   Conference @relation(fields: [conferenceId], references: [id])
   teams        Team[]
+
+  @@unique([ruleset, code])
 }
 
 model Team {
   id             String   @id @default(cuid())
-  name           String   @unique // abbreviation used as display name, e.g. "ALA"
+  ruleset        String   @default("CLASSIC")
+  name           String   // abbreviation used as display name, e.g. "ALA"
+  fullName       String?  // e.g. "Alabama" -- MEGA144 only, not displayed yet
+  mascot         String?  // e.g. "Crimson Tide" -- MEGA144 only, not displayed yet
   conferenceId   String
   divisionId     String
-  historicScore  Float // fixed historical-strength input (TeamPlan.Score)
+  historicScore  Float?   // CLASSIC only: fixed historical-strength input (TeamPlan.Score), needs scalePrestige()
+  startingPrestige Float? // MEGA144 only: given directly, used as-is (no scaling)
   conference     Conference @relation(fields: [conferenceId], references: [id])
   division       Division   @relation(fields: [divisionId], references: [id])
   players        Player[]
@@ -40,11 +54,14 @@ model Team {
   movesFrom      RosterMove[] @relation("MoveFrom")
   movesTo        RosterMove[] @relation("MoveTo")
   rosterSnapshots PlayerSeasonSnapshot[]
+
+  @@unique([ruleset, name])
 }
 
 model Dynasty {
   id                 String   @id @default(cuid())
   name               String
+  ruleset            String   @default("CLASSIC")
   createdAt          DateTime @default(now())
   currentSeasonNumber Int     @default(1)
   players            Player[]
@@ -157,7 +174,7 @@ model TeamSeason {
   confWins    Int     @default(0)
   confLosses  Int     @default(0)
   rank        Int?
-  playoffSeed Int? // 1-6 once the playoff field is selected; null otherwise.
+  playoffSeed Int? // 1-6 (CLASSIC) or 1-12 (MEGA144) once the playoff field is selected; null otherwise.
   // Decided once (right after conference championships) and never recomputed --
   // national rank keeps moving as later playoff/bowl games are played, so this
   // must be persisted rather than re-derived from "current" standings.

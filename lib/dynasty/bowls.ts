@@ -1,6 +1,29 @@
 import { prisma } from "@/lib/db/client";
-import { BOWL_ELIGIBILITY_WINS, CONFERENCE_BOWLS, EXTRA_BOWL_NAMES, NATIONAL_BOWLS } from "@/lib/data/bowls";
+import {
+  BOWL_ELIGIBILITY_WINS,
+  CONFERENCE_BOWLS,
+  EXTRA_BOWL_NAMES,
+  NATIONAL_BOWLS,
+  type ConferenceBowlSpec,
+  type NationalBowlSpec,
+} from "@/lib/data/bowls";
+import { CONFERENCE_BOWLS_144, EXTRA_BOWL_NAMES_144, NATIONAL_BOWLS_144 } from "@/lib/data/bowls144";
 import { pairAvoidingSameConference } from "@/lib/sim/bowlPairing";
+
+export interface BowlData {
+  nationalBowls: NationalBowlSpec[];
+  conferenceBowls: ConferenceBowlSpec[];
+  extraBowlNames: string[];
+}
+
+export const BOWL_DATA_BY_RULESET: Record<string, BowlData> = {
+  CLASSIC: { nationalBowls: NATIONAL_BOWLS, conferenceBowls: CONFERENCE_BOWLS, extraBowlNames: EXTRA_BOWL_NAMES },
+  MEGA144: {
+    nationalBowls: NATIONAL_BOWLS_144,
+    conferenceBowls: CONFERENCE_BOWLS_144,
+    extraBowlNames: EXTRA_BOWL_NAMES_144,
+  },
+};
 
 export const BOWL_WEEK = 14; // same week as the playoff quarterfinals; standalone, no bracket advancement
 
@@ -17,7 +40,8 @@ export const BOWL_WEEK = 14; // same week as the playoff quarterfinals; standalo
 // lib/sim/playoff.ts#selectPlayoffField) — NOT just "top 6 by rank", since
 // the top-3-conference-champions auto-bid rule can swap in a lower-ranked
 // team over a higher-ranked one.
-export async function createBowlGames(seasonId: string, playoffTeamIds: Set<string>) {
+export async function createBowlGames(seasonId: string, playoffTeamIds: Set<string>, bowlData: BowlData) {
+  const { nationalBowls, conferenceBowls, extraBowlNames } = bowlData;
   const teamSeasons = await prisma.teamSeason.findMany({
     where: { seasonId },
     include: { team: { include: { conference: true } } },
@@ -40,7 +64,7 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
 
   const games: { bowlName: string; awayTeamId: string; homeTeamId: string }[] = [];
 
-  for (const bowl of NATIONAL_BOWLS) {
+  for (const bowl of nationalBowls) {
     const away = pool[bowl.ranks[0] - 1];
     const home = pool[bowl.ranks[1] - 1];
     if (!away || !home) continue;
@@ -58,7 +82,7 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
   }
   // already sorted by powerElo desc from the query, so index = seed - 1
 
-  for (const bowl of CONFERENCE_BOWLS) {
+  for (const bowl of conferenceBowls) {
     const awayTs = remainingByConference.get(bowl.away.conference)?.[bowl.away.seed - 1];
     const homeTs = remainingByConference.get(bowl.home.conference)?.[bowl.home.seed - 1];
     if (!awayTs || !homeTs || used.has(awayTs.teamId) || used.has(homeTs.teamId)) continue;
@@ -71,7 +95,7 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
   // order, skipping same-conference matchups (they just played all season).
   const leftover = pool.filter((ts) => !used.has(ts.teamId));
   pairAvoidingSameConference(leftover).forEach(([away, home], index) => {
-    const bowlName = EXTRA_BOWL_NAMES[index] ?? `Bowl Game ${index + 1}`;
+    const bowlName = extraBowlNames[index] ?? `Bowl Game ${index + 1}`;
     games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
   });
 
