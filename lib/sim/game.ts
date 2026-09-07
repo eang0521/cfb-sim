@@ -88,9 +88,17 @@ function simulateOt(awayRate: number, homeRate: number, rand: Rand): { away: num
   return { away, home, periods: MAX_ROUNDS };
 }
 
-// SeasonGen!AO2 = 1 + SIGN(margin)*15 + TRUNC(offDiff/10) + TRUNC(margin/5)
-function eloDelta(marginForWinner: number, offDiffForWinner: number): number {
-  return 1 + 15 + Math.trunc(offDiffForWinner / 10) + Math.trunc(marginForWinner / 5);
+// SeasonGen!AO2 = 1 + SIGN(H-O)*15 + TRUNC((N-G)/10) + TRUNC((H-O)/5), where
+// H/O are the away/home scores and N/G are the home/away offense ratings.
+// This is always computed from the away team's perspective; home's change is
+// simply the negation (SeasonGen!AP2 = 0-AO2). Because of that, the formula
+// is NOT symmetric by winner: a win on the road nets 2 more rating points
+// than a win at home of the same margin/offense gap (and a loss at home
+// costs 2 fewer than the same loss on the road), and the offense-strength
+// term is always "home offense minus away offense" regardless of who wins.
+function awayEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
+  const margin = awayScore - homeScore;
+  return 1 + Math.sign(margin) * 15 + Math.trunc((homeOffense - awayOffense) / 10) + Math.trunc(margin / 5);
 }
 
 // Conference championships, playoff rounds, and bowls are all played at a
@@ -118,13 +126,7 @@ export function simulateGame(
     otPeriods = ot.periods;
   }
 
-  const margin = awayScore - homeScore;
-  const awayWon = margin > 0;
-  const offDiffAway = away.offRating - home.offRating;
-  // SIGN(H-O) in the sheet is from the away team's perspective (H=away score,
-  // O=home score in the "Official" sheets' naming). Winner always gets +delta.
-  const awayDelta = eloDelta(awayWon ? margin : -margin, awayWon ? offDiffAway : -offDiffAway);
-  const eloChangeAway = awayWon ? awayDelta : -awayDelta;
+  const eloChangeAway = awayEloDelta(awayScore, homeScore, away.offRating, home.offRating);
   const eloChangeHome = -eloChangeAway;
 
   return { awayScore, homeScore, otPeriods, eloChangeAway, eloChangeHome };
