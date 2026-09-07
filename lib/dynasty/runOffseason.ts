@@ -185,6 +185,7 @@ export async function runOffseason(dynastyId: string) {
     const teamsNeeding: TeamNeed[] = groupDepartures.map((d) => ({
       teamId: d.teamId,
       prestige: newPrestigeByTeamId.get(d.teamId)!,
+      priorWins: teamSeasonByTeamId.get(d.teamId)?.wins ?? 0,
     }));
     const transferCandidates: TransferCandidate[] = groupDepartures
       .filter((d) => d.type === "TRANSFER")

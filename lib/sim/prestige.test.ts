@@ -7,25 +7,39 @@ function seeded(sequence: number[]): () => number {
 }
 
 describe("updatePrestige", () => {
-  it("matches the official formula exactly: round(old*2/3) + wins - losses + confBonus + swing", () => {
+  it("matches the official formula exactly: round((old + wins - losses)*2/3) + confBonus + swing", () => {
     // rand() picking index 0 of [-3,-2,-1,1,2,3] -> swing = -3
     const rand = seeded([0]);
     const result = updatePrestige(
       { currentPrestige: 30, totalWins: 9, totalLosses: 3, conferenceRank: 1 },
       rand
     );
-    // round(30*2/3)=20, +9-3=6 -> 26, +confBonus(1)=2 -> 28, +swing(-3) -> 25
-    expect(result).toBe(20 + 9 - 3 + 2 - 3);
+    // round((30+9-3)*2/3) = round(36*2/3) = 24, +confBonus(1)=2 -> 26, +swing(-3) -> 23
+    expect(result).toBe(24 + 2 - 3);
   });
 
-  it("decays negative prestige toward zero too (round(old*2/3))", () => {
+  it("folds wins/losses in BEFORE the 2/3 decay, not after", () => {
+    // Same wins/losses/rank/swing as the case above, but starting prestige
+    // has already been decayed the OLD (wrong) way to isolate the fold-in
+    // order: if wins/losses were still added after decay, this would equal
+    // the case above; it must not.
+    const rand = seeded([0]);
+    const oldOrderResult = Math.round((30 * 2) / 3) + 9 - 3 + 2 - 3; // the pre-change formula
+    const result = updatePrestige(
+      { currentPrestige: 30, totalWins: 9, totalLosses: 3, conferenceRank: 1 },
+      rand
+    );
+    expect(result).not.toBe(oldOrderResult);
+  });
+
+  it("decays negative prestige toward zero too", () => {
     const rand = seeded([0.2]); // floor(0.2*6)=1 -> index 1 -> swing = -2
     const result = updatePrestige(
       { currentPrestige: -9, totalWins: 2, totalLosses: 10, conferenceRank: 6 },
       rand
     );
-    // round(-9*2/3) = round(-6) = -6, +2-10=-8 -> -14, +confBonus(6)=-2 -> -16, +swing(-2) -> -18
-    expect(result).toBe(-6 + 2 - 10 - 2 - 2);
+    // round((-9+2-10)*2/3) = round(-17*2/3) = round(-11.33) = -11, +confBonus(6)=-2 -> -13, +swing(-2) -> -15
+    expect(result).toBe(-11 - 2 - 2);
   });
 });
 
@@ -34,10 +48,10 @@ describe("conferenceRankBonus", () => {
     expect([1, 2, 3, 4, 5, 6].map((rank) => conferenceRankBonus(rank))).toEqual([2, 1, 0, 0, -1, -2]);
   });
 
-  it("matches the MEGA144 [+3,+2,+2,+1,+1,0,0,-1,-1,-2,-2,-3] table for ranks 1-12", () => {
+  it("matches the MEGA144 [+4,+3,+2,+1,+1,0,0,-1,-1,-2,-3,-4] table for ranks 1-12", () => {
     const ranks = Array.from({ length: 12 }, (_, i) => i + 1);
     expect(ranks.map((rank) => conferenceRankBonus(rank, CONFERENCE_RANK_BONUS_MEGA144))).toEqual([
-      3, 2, 2, 1, 1, 0, 0, -1, -1, -2, -2, -3,
+      4, 3, 2, 1, 1, 0, 0, -1, -1, -2, -3, -4,
     ]);
   });
 });

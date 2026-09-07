@@ -1,13 +1,18 @@
 // The transfer-portal / HS-recruiting market that fills every open roster
 // slot each offseason. Supplied directly (not from the workbook):
 //
-//   Team Value  = team's (post-update) prestige + rand()*25
+//   Team Value  = team's (post-update) prestige, ties broken by last
+//                 season's wins (higher wins ranks first)
 //   Player Value = player's current OVR * (rand()+1)   [uniform 1x-2x]
 //
 // Teams needing this position group are ranked by Team Value, pool players
 // (transfers out of other teams + fresh HS recruits) are ranked by Player
 // Value, and the two ranked lists are paired 1:1 — highest Team Value gets
-// the highest Player Value, and so on down the list.
+// the highest Player Value, and so on down the list. Team Value is
+// deliberately NOT randomized (it used to add rand()*25) so that a team's
+// prestige/record reliably determines its recruiting pull -- good programs
+// keep landing the better talent instead of occasionally losing out to
+// random luck.
 
 import type { Rand } from "./rng";
 import { agePlayer, generateRecruit, type PosGroup, type RosterPlayer } from "./roster";
@@ -15,6 +20,7 @@ import { agePlayer, generateRecruit, type PosGroup, type RosterPlayer } from "./
 export interface TeamNeed {
   teamId: string;
   prestige: number;
+  priorWins: number; // last season's wins -- Team Value tiebreak when prestige is equal
 }
 
 export interface TransferCandidate {
@@ -59,8 +65,8 @@ export function runPositionMarket(
   ];
 
   const rankedTeams = teamsNeeding
-    .map((t) => ({ ...t, value: t.prestige + rand() * 25 }))
-    .sort((a, b) => b.value - a.value);
+    .slice()
+    .sort((a, b) => b.prestige - a.prestige || b.priorWins - a.priorWins);
 
   const rankedPool = pool
     .map((entry) => ({ ...entry, rankedOvr: entry.player.ovr, value: entry.player.ovr * (rand() + 1) }))

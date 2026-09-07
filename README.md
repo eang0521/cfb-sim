@@ -63,11 +63,12 @@ None of this is in the original workbook (it modeled aging/graduation only) — 
 - **Transfer portal**: every player not already leaving has a 1/6 chance
   (`rollEntersTransferPortal`) of entering the portal instead of returning to the same slot.
 - **The market** (`lib/sim/recruiting.ts#runPositionMarket`), run once per position group: teams
-  with an opening get a **Team Value** = `(new) prestige + rand()*25`; pool players (that
-  position's transfers, plus one fresh HS recruit per graduation/early-departure opening) get a
-  **Player Value** = `current OVR * (rand()+1)`. Both lists are ranked and paired 1:1 — the
-  highest Team Value lands the highest Player Value, and so on down the list — so pool size always
-  exactly matches openings (transfers fill transfer-created openings; HS recruits replace
+  with an opening get a **Team Value** = `(new) prestige`, ties broken by last season's wins (no
+  added randomness here — a team's prestige/record should reliably determine its recruiting pull);
+  pool players (that position's transfers, plus one fresh HS recruit per graduation/early-departure
+  opening) get a **Player Value** = `current OVR * (rand()+1)`. Both lists are ranked and paired
+  1:1 — the highest Team Value lands the highest Player Value, and so on down the list — so pool
+  size always exactly matches openings (transfers fill transfer-created openings; HS recruits replace
   graduations/departures). A placed transfer is grown one year (same engine as if they'd stayed);
   a placed freshman starts at FR as generated. One rare, accepted quirk: nothing stops the market
   from re-matching a transfer back to the school they just left.
@@ -145,10 +146,12 @@ a few mechanics, and its author's own memory of the exact rule was fuzzy), the m
 supplied directly and ported exactly:
 
 - **`lib/sim/prestige.ts`** — Prestige is *not* static; it updates every offseason:
-  `round(oldPrestige * 2/3) + totalWins - totalLosses + conferenceRankBonus + randomSwing`.
-  `conferenceRankBonus` ranks the 6 conferences by total wins that season (ties broken by the
-  conference's summed old prestige) and applies `[+2, +1, 0, 0, -1, -2]`; `randomSwing` is uniform
-  over `{-3,-2,-1,1,2,3}`.
+  `round((oldPrestige + totalWins - totalLosses) * 2/3) + conferenceRankBonus + randomSwing` (wins
+  and losses are folded in BEFORE the 2/3 decay, so a single season's record swing gets damped
+  immediately rather than carrying over in full). `conferenceRankBonus` ranks the conferences by
+  total wins that season (ties broken by the conference's summed old prestige) and applies
+  `[+2, +1, 0, 0, -1, -2]` (CLASSIC, 6 conferences) or `[+4, +3, +2, +1, +1, 0, 0, -1, -1, -2, -3,
+  -4]` (MEGA144, 12 conferences); `randomSwing` is uniform over `{-3,-2,-1,1,2,3}`.
 - **`lib/data/bowls.ts` / `lib/dynasty/bowls.ts`** — non-playoff bowls for every other 6+-win team:
   2 national at-large bowls (ranks 7-8, 9-10 among non-playoff teams), then 12 conference-vs-
   conference seed bowls straight from the workbook's `List of Bowls` sheet (SEC/B10 get their top
