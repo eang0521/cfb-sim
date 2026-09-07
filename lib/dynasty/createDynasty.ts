@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db/client";
-import { bootstrapInitialRoster, teamRatings } from "@/lib/sim/roster";
+import { bootstrapDynastyRosters, bootstrapInitialRoster, teamRatings } from "@/lib/sim/roster";
 import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
 import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
@@ -38,8 +38,16 @@ export async function createDynasty(name: string, ruleset: Ruleset = "CLASSIC") 
       .map((t, i) => ({ teamId: t.teamId, conferenceRank: i + 1 }))
   );
 
+  // Every real team's initial roster, assigned together as one
+  // prestige-driven market (see bootstrapDynastyRosters) rather than each
+  // team rolling independently.
+  const rosterByTeamId = bootstrapDynastyRosters(
+    realTeams.map((t) => ({ teamId: t.id, prestige: startingPrestigeByTeamId.get(t.id)! })),
+    1
+  );
+
   for (const team of teams) {
-    const roster = bootstrapInitialRoster(1);
+    const roster = team.id === fcsTeam.id ? bootstrapInitialRoster(1) : rosterByTeamId.get(team.id)!;
     await prisma.player.createMany({
       data: roster.map((p) => ({
         dynastyId: dynasty.id,

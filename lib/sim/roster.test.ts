@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agePlayer,
+  bootstrapDynastyRosters,
   bootstrapInitialRoster,
   generateFreshmanClass,
   isEarlyDeparture,
@@ -139,6 +140,70 @@ describe("bootstrapInitialRoster", () => {
       for (const p of bootstrapInitialRoster(1, Math.random)) years.add(p.classYear);
     }
     expect(years.size).toBeGreaterThan(1);
+  });
+});
+
+describe("bootstrapDynastyRosters", () => {
+  it("gives every team exactly 6 players, one per position group", () => {
+    const teams = [
+      { teamId: "hi", prestige: 25 },
+      { teamId: "mid", prestige: 5 },
+      { teamId: "lo", prestige: -20 },
+    ];
+    const rosters = bootstrapDynastyRosters(teams, 1, Math.random);
+    for (const t of teams) {
+      const roster = rosters.get(t.teamId)!;
+      expect(roster).toHaveLength(6);
+      expect(roster.map((p) => p.posGroup).sort()).toEqual(["DB", "DL", "LB", "OL", "QB", "UT"]);
+    }
+  });
+
+  it("spreads class years across the league (not all one year)", () => {
+    const teams = Array.from({ length: 20 }, (_, i) => ({ teamId: `t${i}`, prestige: 0 }));
+    const rosters = bootstrapDynastyRosters(teams, 1, Math.random);
+    const years = new Set<string>();
+    for (const roster of rosters.values()) {
+      for (const p of roster) years.add(p.classYear);
+    }
+    expect(years.size).toBeGreaterThan(1);
+  });
+
+  it("correlates higher prestige with a stronger average roster over many trials", () => {
+    // Not deterministic per-run (it's a market with randomness on both
+    // sides), but across enough independent leagues the high-prestige team
+    // should come out ahead far more often than not.
+    let highWonCount = 0;
+    const trials = 60;
+    for (let trial = 0; trial < trials; trial++) {
+      const teams = [
+        { teamId: "high", prestige: 27 },
+        ...Array.from({ length: 10 }, (_, i) => ({ teamId: `filler${i}`, prestige: 0 })),
+        { teamId: "low", prestige: -25 },
+      ];
+      const rosters = bootstrapDynastyRosters(teams, 1, Math.random);
+      const avgOvr = (id: string) => {
+        const roster = rosters.get(id)!;
+        return roster.reduce((sum, p) => sum + p.ovr, 0) / roster.length;
+      };
+      if (avgOvr("high") > avgOvr("low")) highWonCount++;
+    }
+    expect(highWonCount / trials).toBeGreaterThan(0.7);
+  });
+
+  it("progresses each player's OVR to reflect their assigned class year (later years >= freshman-level baseline on average)", () => {
+    // Freshman-level baseline is HS + 1 growth step; a SR has 3 more growth
+    // steps on top of that, so should trend meaningfully higher on average.
+    const teams = Array.from({ length: 60 }, (_, i) => ({ teamId: `t${i}`, prestige: 0 }));
+    const rosters = bootstrapDynastyRosters(teams, 1, Math.random);
+    const byClassYear = new Map<string, number[]>();
+    for (const roster of rosters.values()) {
+      for (const p of roster) {
+        if (!byClassYear.has(p.classYear)) byClassYear.set(p.classYear, []);
+        byClassYear.get(p.classYear)!.push(p.ovr);
+      }
+    }
+    const avg = (arr: number[]) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    expect(avg(byClassYear.get("SR")!)).toBeGreaterThan(avg(byClassYear.get("FR")!));
   });
 });
 

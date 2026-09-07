@@ -170,6 +170,77 @@ export function bootstrapInitialRoster(season: number, rand: Rand = Math.random)
   });
 }
 
+export interface TeamPrestigeInput {
+  teamId: string;
+  prestige: number;
+}
+
+// Bootstraps every real team's initial 6-man roster for a brand-new dynasty,
+// one position group at a time, as a single prestige-driven market (same
+// Team-Value/Player-Value mechanism as the ongoing offseason recruiting
+// market in lib/sim/recruiting.ts) instead of every team rolling its roster
+// independently -- so a blue-blood program's day-1 roster is more likely to
+// be stacked with good young talent than a bottom-feeder's.
+//
+// For each position group: every team's slot gets a random target class
+// year (FR-SR) and a freshly generated HS recruit aged up by exactly one
+// season of growth -- "freshman level" (HS + one season of progression), a
+// flat baseline for every player in the market regardless of their eventual
+// class, so the market ranks underlying talent rather than accumulated
+// growth. Teams are ranked by Team Value (prestige + rand()*25), pool
+// players by Player Value (that baseline OVR * (rand()+1)), and the two
+// ranked lists are paired 1:1 (highest Team Value gets highest Player
+// Value, and so on down the list) -- then each assigned player is aged the
+// rest of the way up to their pre-rolled target class year.
+export function bootstrapDynastyRosters(
+  teams: TeamPrestigeInput[],
+  season: number,
+  rand: Rand = Math.random
+): Map<string, RosterPlayer[]> {
+  const rosterByTeamId = new Map<string, RosterPlayer[]>();
+  for (const t of teams) rosterByTeamId.set(t.teamId, []);
+
+  for (const group of Object.keys(POS_GROUP_META) as PosGroup[]) {
+    const pool = teams.map(() => {
+      const targetYearIndex = Math.floor(rand() * CLASS_YEARS.length);
+      const recruit = generateRecruit(group, season - targetYearIndex, rand);
+      // Freshman-level baseline: exactly one season of progression, no
+      // matter what class this player will end up being.
+      const devTrait = walkDevTrait(recruit.devTrait, rand);
+      const ovr = growOvr(recruit.ovr, recruit.devTrait, rand);
+      return { targetYearIndex, player: { ...recruit, ovr, devTrait, devMarker: devMarker(devTrait) } };
+    });
+
+    const rankedTeams = teams
+      .map((t) => ({ teamId: t.teamId, value: t.prestige + rand() * 25 }))
+      .sort((a, b) => b.value - a.value);
+    const rankedPool = pool
+      .map((entry) => ({ ...entry, value: entry.player.ovr * (rand() + 1) }))
+      .sort((a, b) => b.value - a.value);
+
+    const count = Math.min(rankedTeams.length, rankedPool.length);
+    for (let i = 0; i < count; i++) {
+      const { targetYearIndex, player } = rankedPool[i];
+      let { ovr, devTrait } = player;
+      // Progress from freshman-level up to the pre-rolled target class.
+      for (let step = 0; step < targetYearIndex; step++) {
+        devTrait = walkDevTrait(devTrait, rand);
+        ovr = growOvr(ovr, devTrait, rand);
+      }
+      const finalPlayer: RosterPlayer = {
+        ...player,
+        ovr,
+        devTrait,
+        devMarker: devMarker(devTrait),
+        classYear: CLASS_YEARS[targetYearIndex],
+      };
+      rosterByTeamId.get(rankedTeams[i].teamId)!.push(finalPlayer);
+    }
+  }
+
+  return rosterByTeamId;
+}
+
 const NEXT_YEAR: Record<ClassYear, ClassYear | null> = {
   FR: "SO",
   SO: "JR",

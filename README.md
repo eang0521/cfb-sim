@@ -24,9 +24,17 @@ Run the simulation engine's unit tests with `npm test`.
 
 ## How a dynasty works
 
-1. **Create a dynasty** — bootstraps all 72 teams with a 6-player roster (exactly one of QB, UT,
-   OL, DL, LB, DB each — confirmed directly against the workbook's own team sheets) and generates
-   a 12-game regular-season schedule.
+1. **Create a dynasty** — bootstraps every team's 6-player roster (exactly one of QB, UT, OL, DL,
+   LB, DB each — confirmed directly against the workbook's own team sheets) and generates a
+   12-game regular-season schedule. Initial rosters are assigned by the same prestige-driven
+   market as the ongoing offseason recruiting market (see below), not independently per team: for
+   each position group, every team's slot gets a random target class year (FR-SR) and a fresh HS
+   recruit aged to a flat "freshman level" baseline (HS rating + one season of growth, regardless
+   of the eventual class), then teams are ranked by Team Value and pool players by Player Value
+   and matched 1:1 exactly like the recruiting market, and only THEN is each assigned player aged
+   the rest of the way up to their pre-rolled class year. A blue-blood's day-1 roster is
+   consequently more likely to be stacked with good young talent than a bottom-feeder's, the same
+   way it would be for a real program.
 2. **Simulate Week N** — plays every game for the current week and updates records/rankings.
 3. Once the regular season ends, **Advance Postseason** repeatedly to run:
    - **Conference championships** (each conference's two division leaders, neutral site).
