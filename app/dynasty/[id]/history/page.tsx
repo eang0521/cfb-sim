@@ -68,7 +68,8 @@ export default async function HistoryPage({
                   <summary className="flex cursor-pointer flex-wrap items-center justify-between gap-x-4 px-3 py-2 text-sm">
                     <span className="font-medium">Season {h.seasonNumber}</span>
                     <span className="tabular-nums text-zinc-600">
-                      {h.wins}-{h.losses} ({h.confWins}-{h.confLosses} conf) &middot; {h.resultLabel}
+                      Prestige {h.startOfSeasonPrestige} &middot; {h.wins}-{h.losses} ({h.confWins}-{h.confLosses}{" "}
+                      conf) &middot; {h.resultLabel}
                     </span>
                   </summary>
                   <div className="border-t border-zinc-200 px-3 py-2">

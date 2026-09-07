@@ -86,8 +86,9 @@ export async function getRosterMoves(dynastyId: string, seasonNumber: number) {
   return sortByPosGroup(moves);
 }
 
-// Every season a team has played in this dynasty, with its record and how
-// its postseason run ended (or "Missed Postseason" / "Season In Progress").
+// Every season a team has played in this dynasty, with its starting
+// prestige, record, and how its postseason run ended (or "Missed
+// Postseason" / "Season In Progress").
 export async function getTeamHistory(dynastyId: string, teamId: string) {
   const seasons = await prisma.season.findMany({
     where: { dynastyId },
@@ -109,6 +110,7 @@ export async function getTeamHistory(dynastyId: string, teamId: string) {
     results.push({
       seasonNumber: season.number,
       seasonStatus: season.status,
+      startOfSeasonPrestige: teamSeason.prestige,
       wins: teamSeason.wins,
       losses: teamSeason.losses,
       confWins: teamSeason.confWins,
