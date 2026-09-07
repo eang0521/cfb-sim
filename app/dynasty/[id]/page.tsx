@@ -76,6 +76,9 @@ export default async function DynastyPage({
           <Link href={`/dynasty/${dynasty.id}/history`} className="hover:underline">
             History
           </Link>
+          <Link href={`/dynasty/${dynasty.id}/players`} className="hover:underline">
+            Players
+          </Link>
         </nav>
       </div>
 

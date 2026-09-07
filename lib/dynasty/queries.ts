@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db/client";
 import { sortByPosGroup } from "@/lib/sim/roster";
+import { FCS_TEAM_NAME } from "./fcsTeam";
 
 export interface StandingsSnapshot {
   rank: number | null;
@@ -72,6 +73,17 @@ export async function getAllGames(seasonId: string) {
 
 export async function getTeamRoster(dynastyId: string, teamId: string) {
   const players = await prisma.player.findMany({ where: { dynastyId, teamId } });
+  return sortByPosGroup(players);
+}
+
+// Every real player in the dynasty (current roster, all teams), for the
+// Players database page -- excludes the synthetic FCS team, which has no
+// meaningful roster of its own.
+export async function getAllPlayers(dynastyId: string) {
+  const players = await prisma.player.findMany({
+    where: { dynastyId, team: { name: { not: FCS_TEAM_NAME } } },
+    include: { team: true },
+  });
   return sortByPosGroup(players);
 }
 

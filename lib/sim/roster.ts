@@ -142,7 +142,7 @@ export function generateFreshmanClass(season: number, rand: Rand = Math.random):
   );
 }
 
-const CLASS_YEARS: ClassYear[] = ["FR", "SO", "JR", "SR"];
+export const CLASS_YEARS: ClassYear[] = ["FR", "SO", "JR", "SR"];
 
 // A team's roster is exactly 6 players — one per position group (QB, UT, OL,
 // DL, LB, DB) — confirmed directly against the workbook's `S1Teams` sheet
