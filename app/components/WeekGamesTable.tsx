@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatRank, formatRecord, gameSideDisplay, type StandingsSnapshot } from "@/app/gameDisplay";
+import { formatRank, formatRecord, gameSideDisplay, RANKED_CUTOFF, type StandingsSnapshot } from "@/app/gameDisplay";
 import { ROUND_LABEL } from "@/app/roundLabels";
 
 export interface WeekGamesTableGame {
@@ -35,24 +35,34 @@ export function WeekGamesTable({
   dynastyId: string;
   showBowlNames?: boolean;
 }) {
+  // Sort by the best (lowest-numbered) visible rank in each matchup, so the
+  // marquee games surface first; games with no ranked team keep their
+  // original relative order at the bottom (a stable sort against Infinity).
+  const withDisplay = games.map((g) => {
+    const away = gameSideDisplay(
+      g.played,
+      g.awayRankEntering,
+      g.awayWinsAfter,
+      g.awayLossesAfter,
+      standingsByTeamId.get(g.awayTeam.id)
+    );
+    const home = gameSideDisplay(
+      g.played,
+      g.homeRankEntering,
+      g.homeWinsAfter,
+      g.homeLossesAfter,
+      standingsByTeamId.get(g.homeTeam.id)
+    );
+    const visibleRank = (rank: number | null) => (rank !== null && rank <= RANKED_CUTOFF ? rank : Infinity);
+    const bestRank = Math.min(visibleRank(away.rank), visibleRank(home.rank));
+    return { game: g, away, home, bestRank };
+  });
+  const sorted = withDisplay.slice().sort((a, b) => a.bestRank - b.bestRank);
+
   return (
     <table className="w-full text-left text-sm">
       <tbody>
-        {games.map((g) => {
-          const away = gameSideDisplay(
-            g.played,
-            g.awayRankEntering,
-            g.awayWinsAfter,
-            g.awayLossesAfter,
-            standingsByTeamId.get(g.awayTeam.id)
-          );
-          const home = gameSideDisplay(
-            g.played,
-            g.homeRankEntering,
-            g.homeWinsAfter,
-            g.homeLossesAfter,
-            standingsByTeamId.get(g.homeTeam.id)
-          );
+        {sorted.map(({ game: g, away, home }) => {
           const label = g.bowlName ?? (showBowlNames ? ROUND_LABEL[g.round] ?? null : null);
 
           return (
