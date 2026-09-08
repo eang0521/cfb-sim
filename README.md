@@ -10,17 +10,35 @@ ruleset at creation and stays on it; the two never mix.
 
 ## Getting started
 
+The database is Postgres (via [Neon](https://neon.tech)) both locally and in production -- there's
+no bundled SQLite file, so you need a connection string before anything will run.
+
 ```bash
 npm install
-cp .env.example .env
-npm run db:push    # creates prisma/dev.db from the schema
-npm run db:seed    # seeds both rulesets: 6 conf / 12 div / 72 teams (CLASSIC) + 12 conf / 24 div / 144 teams (MEGA144)
+cp .env.example .env   # then fill in DATABASE_URL with a real Postgres connection string
+npm run db:push        # creates the schema in that database
+npm run db:seed        # seeds both rulesets: 6 conf / 12 div / 72 teams (CLASSIC) + 12 conf / 24 div / 144 teams (MEGA144)
 npm run dev
 ```
 
 Open http://localhost:3000, start a dynasty (pick a ruleset), and simulate.
 
 Run the simulation engine's unit tests with `npm test`.
+
+## Deploying
+
+Hosted on [Vercel](https://vercel.com), deploying straight from this GitHub repo. Database is
+Postgres via Neon's native Vercel integration (Project -> Storage -> Create Database -> Neon),
+which provisions the database and injects `DATABASE_URL` (and a separate branch/URL per
+environment -- Production vs. Preview/Development) automatically; no manual connection-string
+copying needed once that's connected. `postinstall` runs `prisma generate` on every install so
+Vercel's build always has a fresh Prisma Client for whichever branch it's building.
+
+After the database is connected for the first time (or after a schema change), run
+`npm run db:push` and `npm run db:seed` against that environment's `DATABASE_URL` -- easiest via
+`npx vercel env pull .env.production.local` (after `vercel login` / `vercel link`) to fetch it
+locally without ever pasting the connection string anywhere, then point the two commands at that
+file (e.g. `dotenv -e .env.production.local -- npm run db:push`).
 
 ## How a dynasty works
 
