@@ -222,9 +222,17 @@ async function createSemifinals(seasonId: string, seeds: Seed[], quarterfinals: 
     return seedByTeam.get(winnerId)!;
   };
 
-  // quarterfinals[0] = 3v6, quarterfinals[1] = 4v5 (creation order in buildQuarterfinals)
-  const qf1Winner = winnerOf(quarterfinals[0]);
-  const qf2Winner = winnerOf(quarterfinals[1]);
+  // `quarterfinals` comes from an unordered findMany, so it can't be trusted
+  // to still be in [3v6, 4v5] creation order -- identify each game by its
+  // lower seed (3 or 4, the only seeds that appear in exactly one game each)
+  // instead of by array position.
+  const winnerByLowSeed = new Map<number, Seed>();
+  for (const g of quarterfinals) {
+    const lowSeed = Math.min(seedByTeam.get(g.awayTeamId)!.seed, seedByTeam.get(g.homeTeamId)!.seed);
+    winnerByLowSeed.set(lowSeed, winnerOf(g));
+  }
+  const qf1Winner = winnerByLowSeed.get(3)!;
+  const qf2Winner = winnerByLowSeed.get(4)!;
   const matchups = buildSemifinals(seed1, seed2, qf1Winner, qf2Winner);
 
   await prisma.game.createMany({
@@ -259,12 +267,20 @@ async function createQuarterfinals12(seasonId: string, seeds: Seed[], firstRound
     const winnerId = g.awayScore! > g.homeScore! ? g.awayTeamId : g.homeTeamId;
     return seedByTeam.get(winnerId)!;
   };
-  // firstRound creation order matches buildFirstRound12: 5v12, 6v11, 7v10, 8v9.
+  // `firstRound` comes from an unordered findMany, so it can't be trusted to
+  // still be in [5v12, 6v11, 7v10, 8v9] creation order -- identify each game
+  // by its lower seed (5, 6, 7, or 8, each appearing in exactly one game)
+  // instead of by array position.
+  const winnerByLowSeed = new Map<number, Seed>();
+  for (const g of firstRound) {
+    const lowSeed = Math.min(seedByTeam.get(g.awayTeamId)!.seed, seedByTeam.get(g.homeTeamId)!.seed);
+    winnerByLowSeed.set(lowSeed, winnerOf(g));
+  }
   const winners: [Seed, Seed, Seed, Seed] = [
-    winnerOf(firstRound[0]),
-    winnerOf(firstRound[1]),
-    winnerOf(firstRound[2]),
-    winnerOf(firstRound[3]),
+    winnerByLowSeed.get(5)!,
+    winnerByLowSeed.get(6)!,
+    winnerByLowSeed.get(7)!,
+    winnerByLowSeed.get(8)!,
   ];
   const matchups = buildQuarterfinals12(seeds, winners);
 
@@ -281,18 +297,27 @@ async function createQuarterfinals12(seasonId: string, seeds: Seed[], firstRound
 }
 
 async function createSemifinals12(seasonId: string, quarterfinals: GameRow[]) {
-  // buildSemifinals12 only needs each winner's team id to carry forward --
-  // seed number is irrelevant past this point (the bracket is already fixed).
+  // `quarterfinals` comes from an unordered findMany, so it can't be trusted
+  // to still be in [1-side, 2-side, 3-side, 4-side] creation order --
+  // identify each game by its bye seed (1, 2, 3, or 4: the seed-1-4 team is
+  // always the lower seed in its quarterfinal, since every first-round
+  // winner it could face has seed 5 or worse) instead of by array position.
+  const seeds = await getPersistedSeeds(seasonId);
+  const seedByTeam = new Map(seeds.map((s) => [s.teamId, s.seed]));
   const winnerOf = (g: GameRow): Seed => {
     const winnerId = g.awayScore! > g.homeScore! ? g.awayTeamId : g.homeTeamId;
     return { teamId: winnerId, seed: 0 };
   };
-  // quarterfinals creation order matches buildQuarterfinals12: 1-side, 2-side, 3-side, 4-side.
+  const winnerByByeSeed = new Map<number, Seed>();
+  for (const g of quarterfinals) {
+    const byeSeed = Math.min(seedByTeam.get(g.awayTeamId)!, seedByTeam.get(g.homeTeamId)!);
+    winnerByByeSeed.set(byeSeed, winnerOf(g));
+  }
   const winners: [Seed, Seed, Seed, Seed] = [
-    winnerOf(quarterfinals[0]),
-    winnerOf(quarterfinals[1]),
-    winnerOf(quarterfinals[2]),
-    winnerOf(quarterfinals[3]),
+    winnerByByeSeed.get(1)!,
+    winnerByByeSeed.get(2)!,
+    winnerByByeSeed.get(3)!,
+    winnerByByeSeed.get(4)!,
   ];
   const matchups = buildSemifinals12(winners);
 
