@@ -21,6 +21,21 @@ export interface WeekGamesTableGame {
   homeTeam: { id: string; name: string };
 }
 
+// Bracket rounds are seeded -- the number that matters for these games is
+// the persisted playoff seed, not the team's live national rank (which
+// drifts as the postseason plays out and has no fixed relationship to seed
+// anyway, since the top-N conference-champion auto-bid rule means seed
+// order isn't just rank order).
+const BRACKET_ROUNDS = new Set(["FIRST_ROUND", "QUARTERFINAL", "SEMIFINAL", "FINAL"]);
+
+function liveSnapshotFor(
+  round: string,
+  snapshot: StandingsSnapshot | undefined
+): StandingsSnapshot | undefined {
+  if (!snapshot || !BRACKET_ROUNDS.has(round)) return snapshot;
+  return { ...snapshot, rank: snapshot.playoffSeed };
+}
+
 // Rank = as of entering the week (frozen once played); record = as of right
 // after that specific game (falls back to the live record when unplayed).
 // Columns are real <table> cells so ranks/names/records/scores each line up
@@ -46,14 +61,14 @@ export function WeekGamesTable({
       g.awayRankEntering,
       g.awayWinsAfter,
       g.awayLossesAfter,
-      standingsByTeamId.get(g.awayTeam.id)
+      liveSnapshotFor(g.round, standingsByTeamId.get(g.awayTeam.id))
     );
     const home = gameSideDisplay(
       g.played,
       g.homeRankEntering,
       g.homeWinsAfter,
       g.homeLossesAfter,
-      standingsByTeamId.get(g.homeTeam.id)
+      liveSnapshotFor(g.round, standingsByTeamId.get(g.homeTeam.id))
     );
     const visibleRank = (rank: number | null) => (rank !== null && rank <= RANKED_CUTOFF ? rank : Infinity);
     const bestRank = Math.min(visibleRank(away.rank), visibleRank(home.rank));

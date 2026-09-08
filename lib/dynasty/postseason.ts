@@ -325,7 +325,14 @@ async function createFinal(seasonId: string, semifinals: GameRow[]) {
   });
 }
 
-async function simulateGames(games: (GameRow & { seasonId: string; neutralSite: boolean })[]) {
+// Bracket rounds (unlike conference championships and bowls) are seeded --
+// the number that actually matters for these games is the persisted playoff
+// seed, not the team's live national rank, which drifts as the postseason
+// plays out and has no fixed relationship to seed anyway (the top-N
+// conference-champion auto-bid rule means seed order isn't just rank order).
+const BRACKET_ROUNDS = new Set(["FIRST_ROUND", "QUARTERFINAL", "SEMIFINAL", "FINAL"]);
+
+async function simulateGames(games: (GameRow & { seasonId: string; round: string; neutralSite: boolean })[]) {
   for (const game of games) {
     const [away, home] = await Promise.all([
       prisma.teamSeason.findUniqueOrThrow({
@@ -345,6 +352,7 @@ async function simulateGames(games: (GameRow & { seasonId: string; neutralSite: 
     const awayRecord = await updateTeamRecord(game.seasonId, game.awayTeamId, awayWon, isConferenceGame, result.eloChangeAway);
     const homeRecord = await updateTeamRecord(game.seasonId, game.homeTeamId, !awayWon, isConferenceGame, result.eloChangeHome);
 
+    const isBracketRound = BRACKET_ROUNDS.has(game.round);
     await prisma.game.update({
       where: { id: game.id },
       data: {
@@ -354,8 +362,8 @@ async function simulateGames(games: (GameRow & { seasonId: string; neutralSite: 
         eloChangeAway: result.eloChangeAway,
         eloChangeHome: result.eloChangeHome,
         played: true,
-        awayRankEntering: away.rank ?? null,
-        homeRankEntering: home.rank ?? null,
+        awayRankEntering: (isBracketRound ? away.playoffSeed : away.rank) ?? null,
+        homeRankEntering: (isBracketRound ? home.playoffSeed : home.rank) ?? null,
         awayWinsAfter: awayRecord?.wins ?? null,
         awayLossesAfter: awayRecord?.losses ?? null,
         homeWinsAfter: homeRecord?.wins ?? null,

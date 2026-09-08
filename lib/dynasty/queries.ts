@@ -4,6 +4,7 @@ import { FCS_TEAM_NAME } from "./fcsTeam";
 
 export interface StandingsSnapshot {
   rank: number | null;
+  playoffSeed: number | null;
   wins: number;
   losses: number;
   powerElo: number;
@@ -31,7 +32,12 @@ export async function getStandings(seasonId: string) {
 // app/gameDisplay.ts).
 export async function getStandingsSnapshotMap(seasonId: string): Promise<Map<string, StandingsSnapshot>> {
   const standings = await getStandings(seasonId);
-  return new Map(standings.map((ts) => [ts.teamId, { rank: ts.rank, wins: ts.wins, losses: ts.losses, powerElo: ts.powerElo }]));
+  return new Map(
+    standings.map((ts) => [
+      ts.teamId,
+      { rank: ts.rank, playoffSeed: ts.playoffSeed, wins: ts.wins, losses: ts.losses, powerElo: ts.powerElo },
+    ])
+  );
 }
 
 export async function getWeekGames(seasonId: string, week: number) {
@@ -176,8 +182,20 @@ async function getSeasonResultLabel(seasonId: string, teamId: string, seasonStat
   const semifinal = postseasonGames.find((g) => g.round === "SEMIFINAL");
   if (semifinal) return "Lost Playoff Semis";
 
+  // QUARTERFINAL is the bracket's FIRST game in the 6-team CLASSIC field
+  // (seeds 1-2 bye straight into the semis), but in MEGA144's 12-team field
+  // it's a LATER round -- seeds 5-12 play an actual FIRST_ROUND first, and
+  // even seeds 1-4's bye means their first bracket game IS the quarterfinal.
+  // Whether "quarterfinal" means "first round" or not depends on whether
+  // this SEASON's postseason has a FIRST_ROUND at all (MEGA144 only).
   const quarterfinal = postseasonGames.find((g) => g.round === "QUARTERFINAL");
-  if (quarterfinal) return "Lost Playoff First Round";
+  if (quarterfinal) {
+    const hasFirstRound = (await prisma.game.count({ where: { seasonId, round: "FIRST_ROUND" } })) > 0;
+    return hasFirstRound ? "Lost Playoff Quarterfinal" : "Lost Playoff First Round";
+  }
+
+  const firstRound = postseasonGames.find((g) => g.round === "FIRST_ROUND");
+  if (firstRound) return "Lost Playoff First Round";
 
   const bowl = postseasonGames.find((g) => g.round === "BOWL");
   if (bowl) return `${won(bowl) ? "Won" : "Lost"} ${bowl.bowlName}`;

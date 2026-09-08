@@ -9,9 +9,13 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
   if (!dynasty || !season) notFound();
 
   const standings = await getStandings(season.id);
+  const isMega144 = dynasty.ruleset === "MEGA144";
 
   const postseasonGames = await prisma.game.findMany({
-    where: { seasonId: season.id, round: { in: ["CONF_CHAMPIONSHIP", "QUARTERFINAL", "SEMIFINAL", "FINAL", "BOWL"] } },
+    where: {
+      seasonId: season.id,
+      round: { in: ["CONF_CHAMPIONSHIP", "FIRST_ROUND", "QUARTERFINAL", "SEMIFINAL", "FINAL", "BOWL"] },
+    },
     include: { awayTeam: true, homeTeam: true },
     orderBy: { week: "asc" },
   });
@@ -65,9 +69,9 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
         <h2 className="mb-2 font-semibold">Playoff Field</h2>
         {seeds.length === 0 ? (
           <p className="text-sm text-zinc-400">
-            Set once conference championships finish — the top 3 conference champions (by national
-            rank) auto-qualify no matter their rank, the other 3 spots go to the best-ranked teams
-            left, and the field is then re-seeded 1-6 by rank.
+            {isMega144
+              ? "Set once conference championships finish — the top 6 conference champions (by national rank) auto-qualify no matter their rank, the other 6 spots go to the best-ranked teams left, and the field is then re-seeded 1-12 by rank."
+              : "Set once conference championships finish — the top 3 conference champions (by national rank) auto-qualify no matter their rank, the other 3 spots go to the best-ranked teams left, and the field is then re-seeded 1-6 by rank."}
           </p>
         ) : (
           <ol className="flex flex-col gap-1 text-sm">
@@ -88,16 +92,27 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
             })}
           </ol>
         )}
-        <p className="mt-1 text-xs text-zinc-500">Seeds 1-2 receive a bye into the semifinals. All postseason games are neutral-site.</p>
+        <p className="mt-1 text-xs text-zinc-500">
+          {isMega144
+            ? "Seeds 1-4 receive a bye into the quarterfinals. All postseason games are neutral-site."
+            : "Seeds 1-2 receive a bye into the semifinals. All postseason games are neutral-site."}
+        </p>
       </section>
 
-      {(["QUARTERFINAL", "SEMIFINAL", "FINAL"] as const).map((round) => {
+      {(isMega144
+        ? (["FIRST_ROUND", "QUARTERFINAL", "SEMIFINAL", "FINAL"] as const)
+        : (["QUARTERFINAL", "SEMIFINAL", "FINAL"] as const)
+      ).map((round) => {
         const games = postseasonGames.filter((g) => g.round === round);
         if (games.length === 0) return null;
         return (
           <section key={round}>
             <h2 className="mb-2 font-semibold">
-              {round === "FINAL" ? "National Championship" : round.charAt(0) + round.slice(1).toLowerCase()}
+              {round === "FINAL"
+                ? "National Championship"
+                : round === "FIRST_ROUND"
+                  ? "First Round"
+                  : round.charAt(0) + round.slice(1).toLowerCase()}
             </h2>
             <ul className="flex flex-col gap-1 text-sm">{games.map(gameLine)}</ul>
           </section>
