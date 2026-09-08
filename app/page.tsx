@@ -2,6 +2,12 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { createDynastyAction } from "./actions";
 
+// This is the only route with no dynamic segment, so Next.js will otherwise
+// try to statically prerender it (running the dynasty-list query at BUILD
+// time, before a database is even guaranteed to be reachable, and baking in
+// a snapshot that would never reflect new dynasties without a fresh deploy).
+export const dynamic = "force-dynamic";
+
 export default async function HomePage() {
   const dynasties = await prisma.dynasty.findMany({ orderBy: { createdAt: "desc" } });
 
