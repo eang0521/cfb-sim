@@ -54,6 +54,7 @@ model Team {
   movesFrom      RosterMove[] @relation("MoveFrom")
   movesTo        RosterMove[] @relation("MoveTo")
   rosterSnapshots PlayerSeasonSnapshot[]
+  heismanSeasons Season[] @relation("HeismanWinner")
 
   @@unique([ruleset, name])
 }
@@ -155,6 +156,17 @@ model Season {
   dynasty     Dynasty      @relation(fields: [dynastyId], references: [id])
   teamSeasons TeamSeason[]
   games       Game[]
+
+  // The Heisman winner, decided once right after conference championships
+  // and never recomputed -- postseason games (playoff/bowls) don't affect
+  // team win totals used in the HEISMAN value, so this must be frozen here
+  // rather than re-derived later (same reasoning as TeamSeason.playoffSeed).
+  heismanTeamId     String?
+  heismanPlayerName String?
+  heismanPosGroup   String?
+  heismanOvr        Int?
+  heismanValue      Float?
+  heismanTeam       Team?   @relation("HeismanWinner", fields: [heismanTeamId], references: [id])
 
   @@unique([dynastyId, number])
 }

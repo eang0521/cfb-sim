@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentSeason, getStandings } from "@/lib/dynasty/queries";
 import { prisma } from "@/lib/db/client";
 import { GREEDY_NATIONAL_BOWLS_144 } from "@/lib/data/bowls144";
+import { formatHeismanValue } from "@/lib/dynasty/heisman";
 
 export default async function PlayoffPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -125,6 +126,22 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
           </section>
         );
       })}
+
+      {season.heismanPlayerName && (
+        <section>
+          <h2 className="mb-2 font-semibold">Heisman</h2>
+          <p className="text-sm text-zinc-600">
+            {season.heismanPlayerName} ({season.heismanPosGroup},{" "}
+            <Link href={`/dynasty/${dynasty.id}/teams?team=${season.heismanTeamId}`} className="hover:underline">
+              {teamById.get(season.heismanTeamId!)?.team.name ?? "?"}
+            </Link>
+            ) &mdash; {formatHeismanValue(season.heismanValue!)} HEISMAN value
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Frozen right after conference championships -- playoff and bowl games don&apos;t affect it.
+          </p>
+        </section>
+      )}
 
       {bowlGames.length > 0 && (
         <section>

@@ -15,6 +15,7 @@ import { updateTeamRecord } from "./teamRecord";
 import { createBowlGames, BOWL_DATA_BY_RULESET } from "./bowls";
 import { createConferenceChampionships, getConferenceChampionIds } from "./conferenceChampionships";
 import { recomputeRankings } from "./simulateWeek";
+import { computeAndPersistHeisman } from "./heisman";
 
 const FIRST_ROUND_WEEK = 14; // MEGA144 only
 const QF_WEEK = 15;
@@ -57,6 +58,9 @@ export async function advancePostseason(seasonId: string): Promise<PostseasonSte
     // reads national rank) and every later round's "entering rank" snapshot
     // are decided -- otherwise both would stay frozen at the week-12 order.
     await recomputeRankings(seasonId);
+    // HEISMAN value is frozen right here, using win totals as of exactly
+    // this point -- postseason (playoff/bowl) games must not affect it.
+    await computeAndPersistHeisman(seasonId);
     return { round: "CONF_CHAMPIONSHIP", stage: "played", seasonComplete: false };
   }
 

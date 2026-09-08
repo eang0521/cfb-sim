@@ -220,24 +220,36 @@ export interface SeasonHistoryTeamRef {
   losses: number;
 }
 
+export interface SeasonHistoryHeisman {
+  teamId: string;
+  teamName: string;
+  playerName: string;
+  posGroup: string;
+  ovr: number;
+  value: number;
+}
+
 export interface SeasonHistorySummary {
   seasonNumber: number;
   champion: SeasonHistoryTeamRef | null;
   runnerUp: SeasonHistoryTeamRef | null;
   conferenceChampions: (SeasonHistoryTeamRef & { conferenceCode: string })[];
   topRanked: (SeasonHistoryTeamRef & { rank: number })[];
+  heisman: SeasonHistoryHeisman | null;
 }
 
 const HISTORY_TOP_RANKED_COUNT = 5;
 
 // A league-wide recap for every COMPLETE season: national champion/runner-up
 // (from the FINAL game), each conference's champion (from CONF_CHAMPIONSHIP
-// games), and the final power-rating top 5 -- for the "History" page, as
-// opposed to the "Teams" page's single-team, season-by-season log.
+// games), the final power-rating top 5, and the HEISMAN winner -- for the
+// "History" page, as opposed to the "Teams" page's single-team,
+// season-by-season log.
 export async function getSeasonHistorySummaries(dynastyId: string): Promise<SeasonHistorySummary[]> {
   const seasons = await prisma.season.findMany({
     where: { dynastyId, status: "COMPLETE" },
     orderBy: { number: "asc" },
+    include: { heismanTeam: true },
   });
 
   const summaries: SeasonHistorySummary[] = [];
@@ -306,7 +318,19 @@ export async function getSeasonHistorySummaries(dynastyId: string): Promise<Seas
       .slice(0, HISTORY_TOP_RANKED_COUNT)
       .map((ts, i) => ({ teamId: ts.teamId, name: ts.team.name, wins: ts.wins, losses: ts.losses, rank: i + 1 }));
 
-    summaries.push({ seasonNumber: season.number, champion, runnerUp, conferenceChampions, topRanked });
+    const heisman: SeasonHistoryHeisman | null =
+      season.heismanTeam && season.heismanPlayerName && season.heismanPosGroup && season.heismanOvr !== null && season.heismanValue !== null
+        ? {
+            teamId: season.heismanTeam.id,
+            teamName: season.heismanTeam.name,
+            playerName: season.heismanPlayerName,
+            posGroup: season.heismanPosGroup,
+            ovr: season.heismanOvr,
+            value: season.heismanValue,
+          }
+        : null;
+
+    summaries.push({ seasonNumber: season.number, champion, runnerUp, conferenceChampions, topRanked, heisman });
   }
   return summaries;
 }

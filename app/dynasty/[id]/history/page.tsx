@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentSeason, getSeasonHistorySummaries, type SeasonHistoryTeamRef } from "@/lib/dynasty/queries";
+import { formatHeismanValue } from "@/lib/dynasty/heisman";
 
 function TeamLink({ dynastyId, team }: { dynastyId: string; team: SeasonHistoryTeamRef }) {
   return (
@@ -47,6 +48,17 @@ export default async function HistoryPage({ params }: { params: Promise<{ id: st
                   </p>
                 ) : (
                   <p className="text-sm text-zinc-400">No national championship game recorded.</p>
+                )}
+
+                {s.heisman && (
+                  <p className="mt-2 text-sm text-zinc-600">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Heisman:</span>{" "}
+                    {s.heisman.playerName} ({s.heisman.posGroup},{" "}
+                    <Link href={`/dynasty/${dynasty.id}/teams?team=${s.heisman.teamId}`} className="hover:underline">
+                      {s.heisman.teamName}
+                    </Link>
+                    ) &mdash; {formatHeismanValue(s.heisman.value)} HEISMAN value
+                  </p>
                 )}
 
                 {s.conferenceChampions.length > 0 && (
