@@ -212,3 +212,101 @@ export async function getSeasonRosterSnapshot(dynastyId: string, teamId: string,
   });
   return sortByPosGroup(players);
 }
+
+export interface SeasonHistoryTeamRef {
+  teamId: string;
+  name: string;
+  wins: number;
+  losses: number;
+}
+
+export interface SeasonHistorySummary {
+  seasonNumber: number;
+  champion: SeasonHistoryTeamRef | null;
+  runnerUp: SeasonHistoryTeamRef | null;
+  conferenceChampions: (SeasonHistoryTeamRef & { conferenceCode: string })[];
+  topRanked: (SeasonHistoryTeamRef & { rank: number })[];
+}
+
+const HISTORY_TOP_RANKED_COUNT = 5;
+
+// A league-wide recap for every COMPLETE season: national champion/runner-up
+// (from the FINAL game), each conference's champion (from CONF_CHAMPIONSHIP
+// games), and the final power-rating top 5 -- for the "History" page, as
+// opposed to the "Teams" page's single-team, season-by-season log.
+export async function getSeasonHistorySummaries(dynastyId: string): Promise<SeasonHistorySummary[]> {
+  const seasons = await prisma.season.findMany({
+    where: { dynastyId, status: "COMPLETE" },
+    orderBy: { number: "asc" },
+  });
+
+  const summaries: SeasonHistorySummary[] = [];
+  for (const season of seasons) {
+    const finalGame = await prisma.game.findFirst({
+      where: { seasonId: season.id, round: "FINAL", played: true },
+      include: { awayTeam: true, homeTeam: true },
+    });
+
+    let champion: SeasonHistoryTeamRef | null = null;
+    let runnerUp: SeasonHistoryTeamRef | null = null;
+    if (finalGame) {
+      const championTeam = finalGame.awayScore! > finalGame.homeScore! ? finalGame.awayTeam : finalGame.homeTeam;
+      const runnerUpTeam = finalGame.awayScore! > finalGame.homeScore! ? finalGame.homeTeam : finalGame.awayTeam;
+      const [championTs, runnerUpTs] = await Promise.all([
+        prisma.teamSeason.findUnique({ where: { seasonId_teamId: { seasonId: season.id, teamId: championTeam.id } } }),
+        prisma.teamSeason.findUnique({ where: { seasonId_teamId: { seasonId: season.id, teamId: runnerUpTeam.id } } }),
+      ]);
+      champion = {
+        teamId: championTeam.id,
+        name: championTeam.name,
+        wins: championTs?.wins ?? 0,
+        losses: championTs?.losses ?? 0,
+      };
+      runnerUp = {
+        teamId: runnerUpTeam.id,
+        name: runnerUpTeam.name,
+        wins: runnerUpTs?.wins ?? 0,
+        losses: runnerUpTs?.losses ?? 0,
+      };
+    }
+
+    const champGames = await prisma.game.findMany({
+      where: { seasonId: season.id, round: "CONF_CHAMPIONSHIP", played: true },
+      include: {
+        awayTeam: { include: { conference: true } },
+        homeTeam: { include: { conference: true } },
+      },
+    });
+    const conferenceChampions = champGames
+      .map((g) => {
+        const winner = g.awayScore! > g.homeScore! ? g.awayTeam : g.homeTeam;
+        return { teamId: winner.id, name: winner.name, conferenceCode: winner.conference.code, wins: 0, losses: 0 };
+      })
+      .sort((a, b) => a.conferenceCode.localeCompare(b.conferenceCode));
+
+    // Backfill win/loss records for the conference champions in one query
+    // rather than one per team.
+    const champTeamSeasons = await prisma.teamSeason.findMany({
+      where: { seasonId: season.id, teamId: { in: conferenceChampions.map((c) => c.teamId) } },
+    });
+    const recordByTeamId = new Map(champTeamSeasons.map((ts) => [ts.teamId, ts]));
+    for (const c of conferenceChampions) {
+      const record = recordByTeamId.get(c.teamId);
+      c.wins = record?.wins ?? 0;
+      c.losses = record?.losses ?? 0;
+    }
+
+    const teamSeasons = await prisma.teamSeason.findMany({
+      where: { seasonId: season.id },
+      include: { team: true },
+      orderBy: { powerElo: "desc" },
+    });
+    const topRanked = teamSeasons
+      .filter((ts) => ts.team.name !== FCS_TEAM_NAME)
+      .slice(0, HISTORY_TOP_RANKED_COUNT)
+      .map((ts, i) => ({ teamId: ts.teamId, name: ts.team.name, wins: ts.wins, losses: ts.losses, rank: i + 1 }));
+
+    summaries.push({ seasonNumber: season.number, champion, runnerUp, conferenceChampions, topRanked });
+  }
+  return summaries;
+}

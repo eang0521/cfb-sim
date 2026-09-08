@@ -1,40 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db/client";
-import { getCurrentSeason, getSeasonRosterSnapshot, getTeamHistory } from "@/lib/dynasty/queries";
-import { FCS_TEAM_NAME } from "@/lib/dynasty/fcsTeam";
-import { TeamSelect } from "@/app/components/TeamSelect";
+import { getCurrentSeason, getSeasonHistorySummaries, type SeasonHistoryTeamRef } from "@/lib/dynasty/queries";
 
-export default async function HistoryPage({
-  params,
-  searchParams,
-}: {
-  params: Promise<{ id: string }>;
-  searchParams: Promise<{ team?: string }>;
-}) {
+function TeamLink({ dynastyId, team }: { dynastyId: string; team: SeasonHistoryTeamRef }) {
+  return (
+    <Link href={`/dynasty/${dynastyId}/teams?team=${team.teamId}`} className="hover:underline">
+      {team.name}
+    </Link>
+  );
+}
+
+export default async function HistoryPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { team: teamParam } = await searchParams;
   const { dynasty } = await getCurrentSeason(id).catch(() => ({ dynasty: null, season: null }));
   if (!dynasty) notFound();
 
-  const teams = await prisma.team.findMany({
-    where: { ruleset: dynasty.ruleset, name: { not: FCS_TEAM_NAME } },
-    include: { conference: true },
-    orderBy: { name: "asc" },
-  });
-  if (teams.length === 0) notFound();
-
-  const selectedTeamId = teamParam && teams.some((t) => t.id === teamParam) ? teamParam : teams[0].id;
-  const selectedTeam = teams.find((t) => t.id === selectedTeamId)!;
-
-  const history = await getTeamHistory(dynasty.id, selectedTeamId);
-
-  const rosterBySeasonNumber = new Map<number, Awaited<ReturnType<typeof getSeasonRosterSnapshot>>>();
-  for (const h of history) {
-    if (h.hasRosterSnapshot) {
-      rosterBySeasonNumber.set(h.seasonNumber, await getSeasonRosterSnapshot(dynasty.id, selectedTeamId, h.seasonNumber));
-    }
-  }
+  const summaries = await getSeasonHistorySummaries(dynasty.id);
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-16">
@@ -42,89 +23,65 @@ export default async function HistoryPage({
         <Link href={`/dynasty/${dynasty.id}`} className="text-sm text-zinc-500 hover:underline">
           &larr; {dynasty.name}
         </Link>
-        <h1 className="text-2xl font-bold">Team History</h1>
+        <h1 className="text-2xl font-bold">History</h1>
       </div>
 
-      <TeamSelect
-        teams={teams.map((t) => ({ id: t.id, name: t.name, conferenceCode: t.conference.code }))}
-        selectedTeamId={selectedTeamId}
-        basePath={`/dynasty/${dynasty.id}/history`}
-      />
+      {summaries.length === 0 ? (
+        <p className="text-sm text-zinc-400">No seasons completed yet.</p>
+      ) : (
+        <ul className="flex flex-col gap-4">
+          {summaries
+            .slice()
+            .reverse()
+            .map((s) => (
+              <li key={s.seasonNumber} className="rounded border border-zinc-200 p-4">
+                <h2 className="mb-2 font-semibold">Season {s.seasonNumber}</h2>
 
-      <section className="flex flex-col gap-2">
-        <h2 className="font-semibold">{selectedTeam.name}</h2>
+                {s.champion && s.runnerUp ? (
+                  <p className="text-sm text-zinc-600">
+                    <span className="font-medium text-zinc-900">
+                      <TeamLink dynastyId={dynasty.id} team={s.champion} />
+                    </span>{" "}
+                    ({s.champion.wins}-{s.champion.losses}) def. <TeamLink dynastyId={dynasty.id} team={s.runnerUp} /> (
+                    {s.runnerUp.wins}-{s.runnerUp.losses}) &mdash; National Champion
+                  </p>
+                ) : (
+                  <p className="text-sm text-zinc-400">No national championship game recorded.</p>
+                )}
 
-        {history.length === 0 ? (
-          <p className="text-sm text-zinc-400">No seasons played yet.</p>
-        ) : (
-          <>
-            <div className="grid grid-cols-[80px_90px_60px_90px_70px_1fr] gap-2 px-3 text-xs uppercase text-zinc-500">
-              <span>Season</span>
-              <span>Prestige</span>
-              <span>Record</span>
-              <span>Conf</span>
-              <span>Rank</span>
-              <span>Result</span>
-            </div>
-            <ul className="flex flex-col gap-2">
-              {history.map((h) => (
-                <li key={h.seasonNumber} className="rounded border border-zinc-200">
-                  <details>
-                    <summary className="grid cursor-pointer grid-cols-[80px_90px_60px_90px_70px_1fr] items-center gap-2 px-3 py-2 text-sm">
-                      <span className="font-medium">Season {h.seasonNumber}</span>
-                      <span className="tabular-nums text-zinc-600">{h.startOfSeasonPrestige}</span>
-                      <span className="tabular-nums text-zinc-600">
-                        {h.wins}-{h.losses}
-                      </span>
-                      <span className="tabular-nums text-zinc-600">
-                        {h.confWins}-{h.confLosses}
-                      </span>
-                      <span className="tabular-nums text-zinc-600">{h.finalRank !== null ? `#${h.finalRank}` : "—"}</span>
-                      <span className="text-zinc-600">{h.resultLabel}</span>
-                    </summary>
-                    <div className="border-t border-zinc-200 px-3 py-2">
-                      <p className="mb-2 text-sm tabular-nums text-zinc-600">
-                        Offense {h.offRating} &middot; Defense {h.defRating}
-                      </p>
-                      {rosterBySeasonNumber.has(h.seasonNumber) ? (
-                        <table className="w-full text-left text-sm">
-                          <thead className="text-xs uppercase text-zinc-500">
-                            <tr>
-                              <th className="py-1">Name</th>
-                              <th className="py-1">Pos</th>
-                              <th className="py-1">Side</th>
-                              <th className="py-1">Yr</th>
-                              <th className="py-1">OVR</th>
-                              <th className="py-1">Dev</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {rosterBySeasonNumber.get(h.seasonNumber)!.map((p) => (
-                              <tr key={p.id} className="odd:bg-zinc-50">
-                                <td className="py-1">{p.playerName}</td>
-                                <td className="py-1">{p.pos}</td>
-                                <td className="py-1">{p.side}</td>
-                                <td className="py-1">{p.classYear}</td>
-                                <td className="py-1 tabular-nums">{p.ovr}</td>
-                                <td className="py-1">{p.devMarker || "—"}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ) : (
-                        <p className="text-sm text-zinc-400">
-                          No roster snapshot recorded for this season (it was played before the history feature was
-                          added).
-                        </p>
-                      )}
-                    </div>
-                  </details>
-                </li>
-              ))}
-            </ul>
-          </>
-        )}
-      </section>
+                {s.conferenceChampions.length > 0 && (
+                  <div className="mt-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+                      Conference Champions
+                    </h3>
+                    <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-zinc-600 sm:grid-cols-3">
+                      {s.conferenceChampions.map((c) => (
+                        <li key={c.conferenceCode}>
+                          <span className="text-zinc-400">{c.conferenceCode}:</span>{" "}
+                          <TeamLink dynastyId={dynasty.id} team={c} /> ({c.wins}-{c.losses})
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {s.topRanked.length > 0 && (
+                  <div className="mt-3">
+                    <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400">Final Top 5</h3>
+                    <ol className="mt-1 flex flex-col gap-0.5 text-sm text-zinc-600">
+                      {s.topRanked.map((t) => (
+                        <li key={t.rank}>
+                          <span className="mr-1 tabular-nums text-zinc-400">#{t.rank}</span>
+                          <TeamLink dynastyId={dynasty.id} team={t} /> ({t.wins}-{t.losses})
+                        </li>
+                      ))}
+                    </ol>
+                  </div>
+                )}
+              </li>
+            ))}
+        </ul>
+      )}
     </main>
   );
 }

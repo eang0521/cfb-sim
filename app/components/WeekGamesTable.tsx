@@ -93,7 +93,7 @@ export function WeekGamesTable({
               )}
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(away.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/history?team=${g.awayTeam.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/teams?team=${g.awayTeam.id}`} className="hover:underline">
                   {g.awayTeam.name}
                 </Link>
               </td>
@@ -101,7 +101,7 @@ export function WeekGamesTable({
               <td className="py-1 pr-3 text-zinc-400">{g.neutralSite ? "vs" : "@"}</td>
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(home.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/history?team=${g.homeTeam.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/teams?team=${g.homeTeam.id}`} className="hover:underline">
                   {g.homeTeam.name}
                 </Link>
               </td>
