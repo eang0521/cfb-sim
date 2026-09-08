@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentSeason, getStandings } from "@/lib/dynasty/queries";
 import { prisma } from "@/lib/db/client";
+import { GREEDY_NATIONAL_BOWLS_144 } from "@/lib/data/bowls144";
 
 export default async function PlayoffPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -20,7 +21,13 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
     orderBy: { week: "asc" },
   });
   const championships = postseasonGames.filter((g) => g.round === "CONF_CHAMPIONSHIP");
-  const bowlGames = postseasonGames.filter((g) => g.round === "BOWL");
+  // The 4 greedy national at-large bowls (Brady/Rice/Payton/Montana) always
+  // list first; everything else keeps its natural (DB) order.
+  const bowlPriority = new Map(GREEDY_NATIONAL_BOWLS_144.map((name, i) => [name, i]));
+  const bowlGames = postseasonGames
+    .filter((g) => g.round === "BOWL")
+    .slice()
+    .sort((a, b) => (bowlPriority.get(a.bowlName ?? "") ?? Infinity) - (bowlPriority.get(b.bowlName ?? "") ?? Infinity));
 
   const championIds = championships
     .filter((g) => g.played)
