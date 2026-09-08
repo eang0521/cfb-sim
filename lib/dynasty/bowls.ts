@@ -66,15 +66,17 @@ async function buildHeadToHeadMap(seasonId: string, teamIds: string[]): Promise<
 export const BOWL_WEEK = 14; // same week as the playoff quarterfinals; standalone, no bracket advancement
 
 // Creates every non-playoff bowl game this season, in order: rank-based
-// national at-large bowls, conference-vs-conference seed bowls (a conference
-// missing an eligible team at some seed just leaves that bowl unplayed --
-// see the "orphans" handling below), greedy national at-large bowls
-// (orphans get first priority here), then leftover teams paired off under
-// the extra/overflow names -- see BowlData. Only bowl-eligible (6+ win)
-// teams not already in the playoff are considered, except for the real NCAA
-// "odd team out" rule: if an odd number of teams clear 6 wins, the single
-// highest-rated team with fewer than 6 wins is added too, so pairings never
-// leave a lone team stranded.
+// national at-large bowls, greedy national at-large bowls (straight off the
+// top of the pool -- see BowlData.greedyNationalBowls), conference-vs-
+// conference seed bowls (a conference missing an eligible team at some seed
+// just leaves that bowl unplayed -- see the "orphans" handling below), then
+// everyone left over filled by that same greedy algorithm under the extra/
+// overflow names, with orphans from the conference-bowl step given first
+// priority there. Only bowl-eligible (6+ win) teams not already in the
+// playoff are considered, except for the real NCAA "odd team out" rule: if
+// an odd number of teams clear 6 wins, the single highest-rated team with
+// fewer than 6 wins is added too, so pairings never leave a lone team
+// stranded.
 //
 // `playoffTeamIds` must be the actual playoff field (see
 // lib/sim/playoff.ts#selectPlayoffField) — NOT just "top N by rank", since
@@ -100,9 +102,27 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
   // nonPlayoffTeams is already sorted by powerElo desc, so filtering it
   // preserves correct national/conference rank order including the exception.
   const pool = nonPlayoffTeams.filter((ts) => eligibleIds.has(ts.teamId));
+  type PoolTeam = (typeof pool)[number];
   const used = new Set<string>();
 
   const games: { bowlName: string; awayTeamId: string; homeTeamId: string }[] = [];
+
+  // Picks the next greedy at-large pairing: the highest-priority waiting
+  // team (an orphan, if any) or otherwise the best remaining team overall
+  // by power rating, paired with the best remaining team NOT from its
+  // conference.
+  function pickGreedyPair(priorityQueue: PoolTeam[]): [PoolTeam, PoolTeam] | null {
+    const available = pool.filter((ts) => !used.has(ts.teamId));
+    if (available.length < 2) return null;
+    let away = priorityQueue.shift();
+    while (away && used.has(away.teamId)) away = priorityQueue.shift();
+    away ??= available[0];
+    const remaining = available.filter((ts) => ts.teamId !== away!.teamId);
+    let homeIndex = remaining.findIndex((ts) => ts.team.conferenceId !== away!.team.conferenceId);
+    if (homeIndex === -1) homeIndex = 0; // every remaining team shares its conference; unavoidable
+    const home = remaining[homeIndex];
+    return home ? [away!, home] : null;
+  }
 
   for (const bowl of nationalBowls) {
     const away = pool[bowl.ranks[0] - 1];
@@ -113,7 +133,18 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
     used.add(home.teamId);
   }
 
-  const byConference = new Map<string, typeof pool>();
+  // Greedy national at-large bowls run FIRST, straight off the top of the
+  // pool -- before conference bowls get a turn.
+  for (const bowlName of greedyNationalBowls ?? []) {
+    const pair = pickGreedyPair([]);
+    if (!pair) break;
+    const [away, home] = pair;
+    games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
+    used.add(away.teamId);
+    used.add(home.teamId);
+  }
+
+  const byConference = new Map<string, PoolTeam[]>();
   for (const ts of pool) {
     if (used.has(ts.teamId)) continue;
     const code = ts.team.conference.code;
@@ -122,8 +153,8 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
   }
   // Conference-bowl seeding is by CONFERENCE record (not overall power
   // rating), ties broken by this season's head-to-head result and then by
-  // power rating -- unlike "best team" below, which always means power
-  // rating.
+  // power rating -- unlike "best team" above/below, which always means
+  // power rating.
   const headToHeadWinner = await buildHeadToHeadMap(
     seasonId,
     pool.map((ts) => ts.teamId)
@@ -142,9 +173,9 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
   // If a conference doesn't have an eligible team at the seed a bowl calls
   // for, that bowl's slot is left open rather than forcing a mismatch --
   // but whichever side DID have a team isn't wasted: it becomes an orphan
-  // that gets first priority in the greedy at-large bowls below, ahead of
-  // the general pool.
-  const orphans: typeof pool = [];
+  // that gets first priority in the final greedy fill below, ahead of the
+  // general remaining pool.
+  const orphans: PoolTeam[] = [];
   for (const bowl of conferenceBowls) {
     const awayTs = byConference.get(bowl.away.conference)?.[bowl.away.seed - 1];
     const homeTs = byConference.get(bowl.home.conference)?.[bowl.home.seed - 1];
@@ -160,35 +191,32 @@ export async function createBowlGames(seasonId: string, playoffTeamIds: Set<stri
     }
   }
 
-  // Greedy national at-large bowls: "best team" here means power rating --
-  // any orphan above is placed first (highest-rated orphan first), then the
-  // best remaining team overall, each paired with the best remaining team
-  // NOT from its conference, one bowl name at a time.
-  const orphanQueue = orphans.slice().sort((a, b) => b.powerElo - a.powerElo);
-  for (const bowlName of greedyNationalBowls ?? []) {
-    const available = pool.filter((ts) => !used.has(ts.teamId));
-    if (available.length < 2) break;
-    let away = orphanQueue.shift();
-    while (away && used.has(away.teamId)) away = orphanQueue.shift();
-    away ??= available[0];
-    const remaining = available.filter((ts) => ts.teamId !== away!.teamId);
-    let homeIndex = remaining.findIndex((ts) => ts.team.conferenceId !== away!.team.conferenceId);
-    if (homeIndex === -1) homeIndex = 0; // every remaining team shares its conference; unavoidable
-    const home = remaining[homeIndex];
-    if (!home) break;
-    games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
-    used.add(away.teamId);
-    used.add(home.teamId);
+  if (greedyNationalBowls) {
+    // Everything left -- the plain extra-name bowls, and any numbered
+    // overflow past those -- is filled by that same greedy algorithm, with
+    // conference-bowl orphans (highest-rated first) given first priority
+    // ahead of the general remaining pool.
+    const orphanQueue = orphans.slice().sort((a, b) => b.powerElo - a.powerElo);
+    let index = 0;
+    while (true) {
+      const pair = pickGreedyPair(orphanQueue);
+      if (!pair) break;
+      const [away, home] = pair;
+      const bowlName = extraBowlNames[index] ?? overflowLabel?.(index) ?? `Bowl Game ${index + 1}`;
+      games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
+      used.add(away.teamId);
+      used.add(home.teamId);
+      index++;
+    }
+  } else {
+    // CLASSIC has no greedy at-large concept -- everyone left over just gets
+    // paired off in rank order, skipping same-conference matchups.
+    const leftover = pool.filter((ts) => !used.has(ts.teamId));
+    pairAvoidingSameConference(leftover).forEach(([away, home], index) => {
+      const bowlName = extraBowlNames[index] ?? overflowLabel?.(index) ?? `Bowl Game ${index + 1}`;
+      games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
+    });
   }
-
-  // Everyone still bowl-eligible and unassigned (including any orphans past
-  // the greedy bowls above) gets paired off in rank order, skipping
-  // same-conference matchups (they just played all season).
-  const leftover = pool.filter((ts) => !used.has(ts.teamId));
-  pairAvoidingSameConference(leftover).forEach(([away, home], index) => {
-    const bowlName = extraBowlNames[index] ?? overflowLabel?.(index) ?? `Bowl Game ${index + 1}`;
-    games.push({ bowlName, awayTeamId: away.teamId, homeTeamId: home.teamId });
-  });
 
   if (games.length > 0) {
     await prisma.game.createMany({
