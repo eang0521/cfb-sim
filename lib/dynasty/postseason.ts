@@ -23,6 +23,12 @@ const FINAL_WEEK = 17;
 
 type GameRow = { id: string; awayTeamId: string; homeTeamId: string; awayScore: number | null; homeScore: number | null };
 
+export interface PostseasonStepResult {
+  round: string;
+  stage: "scheduled" | "played";
+  seasonComplete: boolean;
+}
+
 // Advances the postseason by exactly one step: creates the next unplayed
 // round's games if they don't exist yet, otherwise simulates whichever round
 // is currently pending. Call it repeatedly (mirroring "Simulate Week") until
@@ -34,7 +40,7 @@ type GameRow = { id: string; awayTeamId: string; homeTeamId: string; awayScore: 
 // (seeds 5-12) + every non-playoff bowl game together -> quarterfinals
 // (seeds 1-4 join the first-round winners) -> semifinals -> final.
 // Every postseason game is played at a neutral site.
-export async function advancePostseason(seasonId: string) {
+export async function advancePostseason(seasonId: string): Promise<PostseasonStepResult> {
   const season = await prisma.season.findUniqueOrThrow({ where: { id: seasonId }, include: { dynasty: true } });
   if (season.status !== "POSTSEASON") {
     throw new Error(`Season is ${season.status}, not in the postseason.`);
@@ -43,7 +49,7 @@ export async function advancePostseason(seasonId: string) {
   const championships = await prisma.game.findMany({ where: { seasonId, round: "CONF_CHAMPIONSHIP" } });
   if (championships.length === 0) {
     await createConferenceChampionships(seasonId);
-    return { round: "CONF_CHAMPIONSHIP", stage: "scheduled" as const };
+    return { round: "CONF_CHAMPIONSHIP", stage: "scheduled", seasonComplete: false };
   }
   if (championships.some((g) => !g.played)) {
     await simulateGames(championships.filter((g) => !g.played));
@@ -51,13 +57,13 @@ export async function advancePostseason(seasonId: string) {
     // reads national rank) and every later round's "entering rank" snapshot
     // are decided -- otherwise both would stay frozen at the week-12 order.
     await recomputeRankings(seasonId);
-    return { round: "CONF_CHAMPIONSHIP", stage: "played" as const };
+    return { round: "CONF_CHAMPIONSHIP", stage: "played", seasonComplete: false };
   }
 
   return season.dynasty.ruleset === "MEGA144" ? advancePlayoff12(seasonId) : advancePlayoff6(seasonId);
 }
 
-async function advancePlayoff6(seasonId: string) {
+async function advancePlayoff6(seasonId: string): Promise<PostseasonStepResult> {
   const bowlData = BOWL_DATA_BY_RULESET.CLASSIC;
   const playoffGames = await prisma.game.findMany({
     where: { seasonId, round: { in: ["QUARTERFINAL", "SEMIFINAL", "FINAL", "BOWL"] } },
@@ -67,7 +73,7 @@ async function advancePlayoff6(seasonId: string) {
     const seeds = await selectAndPersistSeeds(seasonId, 6);
     await createQuarterfinals(seasonId, seeds);
     await createBowlGames(seasonId, new Set(seeds.map((s) => s.teamId)), bowlData);
-    return { round: "QUARTERFINAL", stage: "scheduled" as const };
+    return { round: "QUARTERFINAL", stage: "scheduled", seasonComplete: false };
   }
 
   const quarterfinals = playoffGames.filter((g) => g.round === "QUARTERFINAL");
@@ -77,31 +83,31 @@ async function advancePlayoff6(seasonId: string) {
 
   if (quarterfinals.some((g) => !g.played) || bowls.some((g) => !g.played)) {
     await simulateGames([...quarterfinals, ...bowls].filter((g) => !g.played));
-    return { round: "QUARTERFINAL", stage: "played" as const };
+    return { round: "QUARTERFINAL", stage: "played", seasonComplete: false };
   }
   if (semifinals.length === 0) {
     const seeds = await getPersistedSeeds(seasonId);
     await createSemifinals(seasonId, seeds, quarterfinals);
-    return { round: "SEMIFINAL", stage: "scheduled" as const };
+    return { round: "SEMIFINAL", stage: "scheduled", seasonComplete: false };
   }
   if (semifinals.some((g) => !g.played)) {
     await simulateGames(semifinals.filter((g) => !g.played));
-    return { round: "SEMIFINAL", stage: "played" as const };
+    return { round: "SEMIFINAL", stage: "played", seasonComplete: false };
   }
   if (final.length === 0) {
     await createFinal(seasonId, semifinals);
-    return { round: "FINAL", stage: "scheduled" as const };
+    return { round: "FINAL", stage: "scheduled", seasonComplete: false };
   }
   if (final.some((g) => !g.played)) {
     await simulateGames(final.filter((g) => !g.played));
     await prisma.season.update({ where: { id: seasonId }, data: { status: "COMPLETE" } });
-    return { round: "FINAL", stage: "played" as const, seasonComplete: true };
+    return { round: "FINAL", stage: "played", seasonComplete: true };
   }
 
-  return { round: "FINAL", stage: "played" as const, seasonComplete: true };
+  return { round: "FINAL", stage: "played", seasonComplete: true };
 }
 
-async function advancePlayoff12(seasonId: string) {
+async function advancePlayoff12(seasonId: string): Promise<PostseasonStepResult> {
   const bowlData = BOWL_DATA_BY_RULESET.MEGA144;
   const playoffGames = await prisma.game.findMany({
     where: { seasonId, round: { in: ["FIRST_ROUND", "QUARTERFINAL", "SEMIFINAL", "FINAL", "BOWL"] } },
@@ -111,7 +117,7 @@ async function advancePlayoff12(seasonId: string) {
     const seeds = await selectAndPersistSeeds(seasonId, 12);
     await createFirstRound12(seasonId, seeds);
     await createBowlGames(seasonId, new Set(seeds.map((s) => s.teamId)), bowlData);
-    return { round: "FIRST_ROUND", stage: "scheduled" as const };
+    return { round: "FIRST_ROUND", stage: "scheduled", seasonComplete: false };
   }
 
   const firstRound = playoffGames.filter((g) => g.round === "FIRST_ROUND");
@@ -122,36 +128,36 @@ async function advancePlayoff12(seasonId: string) {
 
   if (firstRound.some((g) => !g.played) || bowls.some((g) => !g.played)) {
     await simulateGames([...firstRound, ...bowls].filter((g) => !g.played));
-    return { round: "FIRST_ROUND", stage: "played" as const };
+    return { round: "FIRST_ROUND", stage: "played", seasonComplete: false };
   }
   if (quarterfinals.length === 0) {
     const seeds = await getPersistedSeeds(seasonId);
     await createQuarterfinals12(seasonId, seeds, firstRound);
-    return { round: "QUARTERFINAL", stage: "scheduled" as const };
+    return { round: "QUARTERFINAL", stage: "scheduled", seasonComplete: false };
   }
   if (quarterfinals.some((g) => !g.played)) {
     await simulateGames(quarterfinals.filter((g) => !g.played));
-    return { round: "QUARTERFINAL", stage: "played" as const };
+    return { round: "QUARTERFINAL", stage: "played", seasonComplete: false };
   }
   if (semifinals.length === 0) {
     await createSemifinals12(seasonId, quarterfinals);
-    return { round: "SEMIFINAL", stage: "scheduled" as const };
+    return { round: "SEMIFINAL", stage: "scheduled", seasonComplete: false };
   }
   if (semifinals.some((g) => !g.played)) {
     await simulateGames(semifinals.filter((g) => !g.played));
-    return { round: "SEMIFINAL", stage: "played" as const };
+    return { round: "SEMIFINAL", stage: "played", seasonComplete: false };
   }
   if (final.length === 0) {
     await createFinal(seasonId, semifinals);
-    return { round: "FINAL", stage: "scheduled" as const };
+    return { round: "FINAL", stage: "scheduled", seasonComplete: false };
   }
   if (final.some((g) => !g.played)) {
     await simulateGames(final.filter((g) => !g.played));
     await prisma.season.update({ where: { id: seasonId }, data: { status: "COMPLETE" } });
-    return { round: "FINAL", stage: "played" as const, seasonComplete: true };
+    return { round: "FINAL", stage: "played", seasonComplete: true };
   }
 
-  return { round: "FINAL", stage: "played" as const, seasonComplete: true };
+  return { round: "FINAL", stage: "played", seasonComplete: true };
 }
 
 // The playoff field: for CLASSIC, top 3 conference champions by national

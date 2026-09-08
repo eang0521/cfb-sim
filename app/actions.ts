@@ -5,14 +5,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
 import { createDynasty, type Ruleset } from "@/lib/dynasty/createDynasty";
 import { simulateWeek } from "@/lib/dynasty/simulateWeek";
-import { advancePostseason } from "@/lib/dynasty/postseason";
+import { advancePostseason, type PostseasonStepResult } from "@/lib/dynasty/postseason";
 import { runOffseason } from "@/lib/dynasty/runOffseason";
-import {
-  simulateWeeks,
-  simulateRestOfRegularSeason,
-  simulateRestOfPostseason,
-  simulateRestOfSeason,
-} from "@/lib/dynasty/bulkSimulate";
 
 export async function createDynastyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
@@ -54,30 +48,20 @@ export async function runOffseasonAction(dynastyId: string) {
   redirect(`/dynasty/${dynastyId}?week=1`);
 }
 
-// Bulk regular-season simulation (e.g. "simulate a month"). Lands on the
-// last week actually played so the user sees results rather than a blank
-// upcoming week -- or the plain dashboard if the regular season ended
-// before any week finished playing (shouldn't normally happen from the UI).
-export async function simulateWeeksAction(dynastyId: string, seasonId: string, weeks: number) {
-  const { lastPlayedWeek } = await simulateWeeks(seasonId, weeks);
+// Non-redirecting "one unit of work" actions, called directly (not via a
+// <form>) from BulkSimulateControls' client-side loop so it can show real
+// progress between each network round-trip -- a single big server action
+// gives the browser nothing to report on until the whole thing finishes,
+// which for "simulate the rest of the season" over a network database can
+// run long enough to look frozen.
+export async function simulateWeekStepAction(dynastyId: string, seasonId: string) {
+  const result = await simulateWeek(seasonId);
   revalidatePath(`/dynasty/${dynastyId}`);
-  redirect(lastPlayedWeek ? `/dynasty/${dynastyId}?week=${lastPlayedWeek}` : `/dynasty/${dynastyId}`);
+  return result;
 }
 
-export async function simulateRestOfRegularSeasonAction(dynastyId: string, seasonId: string) {
-  const { lastPlayedWeek } = await simulateRestOfRegularSeason(seasonId);
+export async function advancePostseasonStepAction(dynastyId: string, seasonId: string): Promise<PostseasonStepResult> {
+  const result = await advancePostseason(seasonId);
   revalidatePath(`/dynasty/${dynastyId}`);
-  redirect(lastPlayedWeek ? `/dynasty/${dynastyId}?week=${lastPlayedWeek}` : `/dynasty/${dynastyId}`);
-}
-
-export async function simulateRestOfPostseasonAction(dynastyId: string, seasonId: string) {
-  await simulateRestOfPostseason(seasonId);
-  revalidatePath(`/dynasty/${dynastyId}`);
-  redirect(`/dynasty/${dynastyId}`);
-}
-
-export async function simulateRestOfSeasonAction(dynastyId: string, seasonId: string) {
-  await simulateRestOfSeason(seasonId);
-  revalidatePath(`/dynasty/${dynastyId}`);
-  redirect(`/dynasty/${dynastyId}`);
+  return result;
 }
