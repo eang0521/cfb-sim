@@ -36,7 +36,15 @@ export default async function HistoryPage({ params }: { params: Promise<{ id: st
             .reverse()
             .map((s) => (
               <li key={s.seasonNumber} className="rounded border border-zinc-200 p-4">
-                <h2 className="mb-2 font-semibold">Season {s.seasonNumber}</h2>
+                <div className="mb-2 flex items-center justify-between">
+                  <h2 className="font-semibold">Season {s.seasonNumber}</h2>
+                  <Link
+                    href={`/dynasty/${dynasty.id}/offseason?season=${s.seasonNumber}`}
+                    className="text-sm text-zinc-500 hover:underline"
+                  >
+                    Offseason Report &rarr;
+                  </Link>
+                </div>
 
                 {s.champion && s.runnerUp ? (
                   <p className="text-sm text-zinc-600">

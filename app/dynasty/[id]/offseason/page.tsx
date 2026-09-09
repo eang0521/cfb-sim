@@ -9,12 +9,27 @@ const TYPE_LABEL: Record<string, string> = {
   FRESHMAN: "Incoming Freshman",
 };
 
-export default async function OffseasonReportPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OffseasonReportPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ season?: string }>;
+}) {
   const { id } = await params;
+  const { season: seasonParam } = await searchParams;
   const { dynasty, season } = await getCurrentSeason(id).catch(() => ({ dynasty: null, season: null }));
   if (!dynasty || !season) notFound();
 
-  const moves = await getRosterMoves(dynasty.id, season.number);
+  const parsedSeason = seasonParam ? Number.parseInt(seasonParam, 10) : NaN;
+  const viewedSeasonNumber = Number.isFinite(parsedSeason)
+    ? Math.min(Math.max(parsedSeason, 1), dynasty.currentSeasonNumber)
+    : season.number;
+
+  const canGoPrev = viewedSeasonNumber > 1;
+  const canGoNext = viewedSeasonNumber < dynasty.currentSeasonNumber;
+
+  const moves = await getRosterMoves(dynasty.id, viewedSeasonNumber);
 
   const departures = moves.filter((m) => m.type === "GRADUATED" || m.type === "EARLY_DEPARTURE");
   const transfers = moves.filter((m) => m.type === "TRANSFER");
@@ -37,14 +52,38 @@ export default async function OffseasonReportPage({ params }: { params: Promise<
         <Link href={`/dynasty/${dynasty.id}`} className="text-sm text-zinc-500 hover:underline">
           &larr; {dynasty.name}
         </Link>
-        <h1 className="text-2xl font-bold">Offseason Report — Season {season.number}</h1>
-        <p className="text-sm text-zinc-500">Every departure, transfer, and incoming freshman that produced this season&apos;s rosters.</p>
+        <div className="mt-1 flex items-center gap-2">
+          {canGoPrev ? (
+            <Link
+              href={`/dynasty/${dynasty.id}/offseason?season=${viewedSeasonNumber - 1}`}
+              className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
+              aria-label="Previous season"
+            >
+              &larr;
+            </Link>
+          ) : (
+            <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&larr;</span>
+          )}
+          <h1 className="text-2xl font-bold">Offseason Report — Season {viewedSeasonNumber}</h1>
+          {canGoNext ? (
+            <Link
+              href={`/dynasty/${dynasty.id}/offseason?season=${viewedSeasonNumber + 1}`}
+              className="rounded border border-zinc-300 px-2 py-1 text-sm hover:bg-zinc-50"
+              aria-label="Next season"
+            >
+              &rarr;
+            </Link>
+          ) : (
+            <span className="rounded border border-zinc-100 px-2 py-1 text-sm text-zinc-300">&rarr;</span>
+          )}
+        </div>
+        <p className="text-sm text-zinc-500">Every departure, transfer, and incoming freshman that produced that season&apos;s rosters.</p>
       </div>
 
       {moves.length === 0 ? (
         <p className="text-sm text-zinc-400">
-          No offseason moves recorded yet for this season (season 1&apos;s roster is freshly bootstrapped, not
-          produced by an offseason transition).
+          No offseason moves recorded for this season (season 1&apos;s roster is freshly bootstrapped, not produced
+          by an offseason transition).
         </p>
       ) : (
         <>
