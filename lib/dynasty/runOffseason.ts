@@ -9,7 +9,7 @@ import {
   type RosterPlayer,
 } from "@/lib/sim/roster";
 import { runPositionMarket, type TeamNeed, type TransferCandidate } from "@/lib/sim/recruiting";
-import { CONFERENCE_RANK_BONUS_MEGA144, rankConferencesByWins, updatePrestige } from "@/lib/sim/prestige";
+import { CONFERENCE_BONUS_MEGA144, conferenceRankBonus, rankConferencesByWins, updatePrestige } from "@/lib/sim/prestige";
 import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
 import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
@@ -79,20 +79,34 @@ export async function runOffseason(dynastyId: string) {
 
   // 1. Prestige update -- the NEW prestige is what feeds Team Value in the
   // recruiting market below (a program's current standing drives its pull).
-  const conferenceStats: Record<string, { totalWins: number; totalOldPrestige: number }> = {};
-  for (const conf of new Set(realTeams.map((t) => t.conferenceId))) {
-    const confTeamSeasons = realTeams
-      .filter((t) => t.conferenceId === conf)
-      .map((t) => teamSeasonByTeamId.get(t.id)!)
-      .filter(Boolean);
-    conferenceStats[conf] = {
-      totalWins: confTeamSeasons.reduce((sum, ts) => sum + ts.wins, 0),
-      totalOldPrestige: confTeamSeasons.reduce((sum, ts) => sum + ts.prestige, 0),
-    };
+  //
+  // CLASSIC's conference bonus is still ranked by that season's total wins
+  // (see rankConferencesByWins). MEGA144's is NOT -- its 12 conferences'
+  // bonuses are permanently locked (CONFERENCE_BONUS_MEGA144), independent of
+  // how that season's games went.
+  const conferenceBonusByConferenceId = new Map<string, number>();
+  if (ruleset === "MEGA144") {
+    for (const team of realTeams) {
+      conferenceBonusByConferenceId.set(team.conferenceId, CONFERENCE_BONUS_MEGA144[team.conference.code] ?? 0);
+    }
+  } else {
+    const conferenceStats: Record<string, { totalWins: number; totalOldPrestige: number }> = {};
+    for (const conf of new Set(realTeams.map((t) => t.conferenceId))) {
+      const confTeamSeasons = realTeams
+        .filter((t) => t.conferenceId === conf)
+        .map((t) => teamSeasonByTeamId.get(t.id)!)
+        .filter(Boolean);
+      conferenceStats[conf] = {
+        totalWins: confTeamSeasons.reduce((sum, ts) => sum + ts.wins, 0),
+        totalOldPrestige: confTeamSeasons.reduce((sum, ts) => sum + ts.prestige, 0),
+      };
+    }
+    const conferenceRanks = rankConferencesByWins(conferenceStats);
+    for (const conf of Object.keys(conferenceRanks)) {
+      conferenceBonusByConferenceId.set(conf, conferenceRankBonus(conferenceRanks[conf]));
+    }
   }
-  const conferenceRanks = rankConferencesByWins(conferenceStats);
 
-  const conferenceRankBonusTable = ruleset === "MEGA144" ? CONFERENCE_RANK_BONUS_MEGA144 : undefined;
   const newPrestigeByTeamId = new Map<string, number>();
   for (const team of realTeams) {
     const teamSeason = teamSeasonByTeamId.get(team.id)!;
@@ -103,10 +117,9 @@ export async function runOffseason(dynastyId: string) {
           currentPrestige: teamSeason.prestige,
           totalWins: teamSeason.wins,
           totalLosses: teamSeason.losses,
-          conferenceRank: conferenceRanks[team.conferenceId],
+          conferenceBonus: conferenceBonusByConferenceId.get(team.conferenceId) ?? 0,
         },
-        Math.random,
-        conferenceRankBonusTable
+        Math.random
       )
     );
   }
