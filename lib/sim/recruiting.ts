@@ -13,9 +13,16 @@
 // prestige/record reliably determines its recruiting pull -- good programs
 // keep landing the better talent instead of occasionally losing out to
 // random luck.
+//
+// Market ranking uses each player's CURRENT OVR (a transfer's known ability,
+// a recruit's raw HS rating) -- development happens only once a player is
+// actually placed on a roster: a placed transfer is aged a full year
+// (classYear advances), while a placed freshman gets one year of
+// progression before ever taking the field, but stays classed as FR for
+// their first season (see growPlayerOneYear in roster.ts).
 
 import type { Rand } from "./rng";
-import { agePlayer, generateRecruit, type PosGroup, type RosterPlayer } from "./roster";
+import { agePlayer, generateRecruit, growPlayerOneYear, type PosGroup, type RosterPlayer } from "./roster";
 
 export interface TeamNeed {
   teamId: string;
@@ -77,7 +84,8 @@ export function runPositionMarket(
   for (let i = 0; i < count; i++) {
     const team = rankedTeams[i];
     const entry = rankedPool[i];
-    const finalPlayer = entry.source === "TRANSFER" ? (agePlayer(entry.player, rand) ?? entry.player) : entry.player;
+    const finalPlayer =
+      entry.source === "TRANSFER" ? (agePlayer(entry.player, rand) ?? entry.player) : growPlayerOneYear(entry.player, rand);
     assignments.push({
       teamId: team.teamId,
       player: finalPlayer,

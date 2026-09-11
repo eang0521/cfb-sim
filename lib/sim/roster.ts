@@ -259,6 +259,16 @@ export function agePlayer(player: RosterPlayer, rand: Rand = Math.random): Roste
   return { ...player, classYear: nextYear, devTrait, devMarker: devMarker(devTrait), ovr };
 }
 
+// Same growth + dev-trait walk as agePlayer, but leaves classYear alone --
+// a fresh HS recruit's year of offseason progression before ever taking the
+// field as a true freshman, same "freshman-level" treatment
+// bootstrapDynastyRosters gives day-1 rosters (see its comment).
+export function growPlayerOneYear(player: RosterPlayer, rand: Rand = Math.random): RosterPlayer {
+  const devTrait = walkDevTrait(player.devTrait, rand);
+  const ovr = growOvr(player.ovr, player.devTrait, rand);
+  return { ...player, devTrait, devMarker: devMarker(devTrait), ovr };
+}
+
 // Roster-movement decisions, supplied directly (not from the workbook, which
 // never modeled early departures or transfers): a junior Star (dev=3) player
 // declares early, same as graduating seniors — both leave college football

@@ -72,7 +72,7 @@ describe("runPositionMarket", () => {
     expect(sources.filter((s) => s === "FRESHMAN")).toHaveLength(3);
   });
 
-  it("grows a placed transfer by one year but leaves freshmen at FR", () => {
+  it("grows a placed transfer by one year (classYear advances)", () => {
     const teams: TeamNeed[] = [{ teamId: "dest", prestige: 10, priorWins: 0 }];
     const transfers: TransferCandidate[] = [{ teamId: "src", player: player({ classYear: "SO" }) }];
     const [placed] = runPositionMarket("QB", 1, teams, transfers, 0, Math.random);
@@ -81,11 +81,13 @@ describe("runPositionMarket", () => {
     expect(placed.fromTeamId).toBe("src");
   });
 
-  it("marks freshmen as FR with no origin team", () => {
+  it("gives a placed freshman a year of progression but keeps them classed as FR", () => {
     const teams: TeamNeed[] = [{ teamId: "dest", prestige: 10, priorWins: 0 }];
-    const [placed] = runPositionMarket("QB", 3, teams, [], 1, Math.random);
+    const rand = () => 0.999; // pushes coinGeom/walkDevTrait toward their max drift, so growth is guaranteed
+    const [placed] = runPositionMarket("QB", 3, teams, [], 1, rand);
     expect(placed.source).toBe("FRESHMAN");
     expect(placed.player.classYear).toBe("FR");
     expect(placed.fromTeamId).toBeNull();
+    expect(placed.player.ovr).toBeGreaterThan(placed.rankedOvr);
   });
 });
