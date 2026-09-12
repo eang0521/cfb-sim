@@ -60,16 +60,29 @@ describe("awayEloDelta", () => {
     expect(awayWinDelta).toBe(17); // 1 + 15 + trunc(0/10) + trunc(5/5)
     expect(homeWinOwnDelta).toBe(15); // 2 fewer than the equivalent road win
   });
+
+  it("rewards beating a stronger opponent more than beating a weaker one, for the same margin", () => {
+    const upsetOfStrongerTeam = awayEloDelta(20, 10, 50, 70); // winner (away, 50) beats a STRONGER loser (70) by 10
+    const blowoutOfWeakerTeam = awayEloDelta(20, 10, 70, 50); // winner (away, 70) beats a WEAKER loser (50) by 10
+    expect(upsetOfStrongerTeam).toBeGreaterThan(blowoutOfWeakerTeam);
+  });
 });
 
 describe("neutralEloDelta", () => {
   it("gives the SAME baseline swing for an away win and a home win of identical margin/power-rating gap", () => {
-    // awayEloDelta (real home/away) gives 16 for an away win and only 14 for
-    // an equivalent home win -- neutralEloDelta must not have that gap.
-    const awayWinDelta = neutralEloDelta(20, 15, 60, 50); // away wins by 5, +10 power-rating edge
-    const homeWinDelta = neutralEloDelta(15, 20, 50, 60); // home wins by 5, +10 power-rating edge (mirrored)
-    expect(awayWinDelta).toBe(16 + 1 + 1); // 1 + 15 + trunc(10/10) + trunc(5/5)
-    expect(homeWinDelta).toBe(-(16 + 1 + 1)); // home winning is the away side's LOSS, so negative
+    // awayEloDelta (real home/away) has a +/-2 road/home asymmetry that
+    // neutralEloDelta must not have -- both scenarios below (winner favored
+    // by 10, winning by 5) must swing by the same 16, whichever side wins.
+    const awayWinDelta = neutralEloDelta(20, 15, 60, 50); // away (favored by 10) wins by 5
+    const homeWinDelta = neutralEloDelta(15, 20, 50, 60); // home (favored by 10) wins by 5 (mirrored)
+    expect(awayWinDelta).toBe(16 - 1 + 1); // 1 + 15 + trunc(-10/10) + trunc(5/5)
+    expect(homeWinDelta).toBe(-(16 - 1 + 1)); // home winning is the away side's LOSS, so negative
+  });
+
+  it("rewards beating a stronger opponent more than beating a weaker one, for the same margin", () => {
+    const upsetOfStrongerTeam = neutralEloDelta(20, 10, 50, 70); // winner (50) beats a STRONGER loser (70) by 10
+    const blowoutOfWeakerTeam = neutralEloDelta(20, 10, 70, 50); // winner (70) beats a WEAKER loser (50) by 10
+    expect(upsetOfStrongerTeam).toBeGreaterThan(blowoutOfWeakerTeam);
   });
 
   it("stays zero-sum", () => {
@@ -77,11 +90,14 @@ describe("neutralEloDelta", () => {
     expect(delta).toBe(-neutralEloDelta(17, 24, 48, 55));
   });
 
-  it("differs from the real away/home formula's road-win bonus", () => {
-    // Same inputs, awayEloDelta gives the extra "win on the road" bump that
-    // neutralEloDelta must not.
-    const away = awayEloDelta(30, 20, 60, 50);
-    const neutral = neutralEloDelta(30, 20, 60, 50);
+  it("differs from the real away/home formula's road/home asymmetry", () => {
+    // Same inputs (home, favored by 20, wins by 10): awayEloDelta gives the
+    // home side only +14 (the deliberate -2 home discount), neutralEloDelta
+    // must not apply that discount and gives it +16 instead.
+    const away = awayEloDelta(20, 30, 50, 70);
+    const neutral = neutralEloDelta(20, 30, 50, 70);
     expect(neutral).not.toBe(away);
+    expect(-away).toBe(14);
+    expect(-neutral).toBe(16);
   });
 });

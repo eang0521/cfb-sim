@@ -123,6 +123,15 @@ export function awayEloDelta(
 // there's no real home-field edge to reflect on a neutral field, so neither
 // side should get the away-formula's road-win bonus or take the (equally
 // arbitrary) home-loss discount.
+//
+// The strength-gap term is the LOSER's power rating minus the WINNER's --
+// backwards from what you'd naively expect -- so that beating a team that
+// was rated ABOVE you (an upset) adds to your gain, while beating a team
+// rated BELOW you (chalk) subtracts from it. That's deliberate: awayEloDelta
+// already has this property too (its "home minus away" gap term resolves to
+// exactly this loser-minus-winner shape once you negate for whichever side
+// didn't win), so both formulas reward beating a stronger team more than
+// beating a weaker one, never the reverse.
 export function neutralEloDelta(
   awayScore: number,
   homeScore: number,
@@ -133,7 +142,7 @@ export function neutralEloDelta(
   const awayWon = margin > 0;
   const winnerPowerElo = awayWon ? awayPowerElo : homePowerElo;
   const loserPowerElo = awayWon ? homePowerElo : awayPowerElo;
-  const winnerDelta = 1 + 15 + Math.trunc((winnerPowerElo - loserPowerElo) / 10) + Math.trunc(Math.abs(margin) / 5);
+  const winnerDelta = 1 + 15 + Math.trunc((loserPowerElo - winnerPowerElo) / 10) + Math.trunc(Math.abs(margin) / 5);
   return awayWon ? winnerDelta : -winnerDelta;
 }
 
