@@ -53,12 +53,21 @@ describe("simulateGame", () => {
   });
 });
 
+describe("awayEloDelta", () => {
+  it("gives a road win 2 more points than the equivalent home win", () => {
+    const awayWinDelta = awayEloDelta(20, 15, 50, 50); // away (road) wins by 5, no power-rating gap
+    const homeWinOwnDelta = -awayEloDelta(15, 20, 50, 50); // home's own change for winning at home by 5
+    expect(awayWinDelta).toBe(17); // 1 + 15 + trunc(0/10) + trunc(5/5)
+    expect(homeWinOwnDelta).toBe(15); // 2 fewer than the equivalent road win
+  });
+});
+
 describe("neutralEloDelta", () => {
-  it("gives the SAME baseline swing for an away win and a home win of identical margin/offense gap", () => {
+  it("gives the SAME baseline swing for an away win and a home win of identical margin/power-rating gap", () => {
     // awayEloDelta (real home/away) gives 16 for an away win and only 14 for
     // an equivalent home win -- neutralEloDelta must not have that gap.
-    const awayWinDelta = neutralEloDelta(20, 15, 60, 50); // away wins by 5, +10 offense edge
-    const homeWinDelta = neutralEloDelta(15, 20, 50, 60); // home wins by 5, +10 offense edge (mirrored)
+    const awayWinDelta = neutralEloDelta(20, 15, 60, 50); // away wins by 5, +10 power-rating edge
+    const homeWinDelta = neutralEloDelta(15, 20, 50, 60); // home wins by 5, +10 power-rating edge (mirrored)
     expect(awayWinDelta).toBe(16 + 1 + 1); // 1 + 15 + trunc(10/10) + trunc(5/5)
     expect(homeWinDelta).toBe(-(16 + 1 + 1)); // home winning is the away side's LOSS, so negative
   });

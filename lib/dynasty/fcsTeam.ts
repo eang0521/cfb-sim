@@ -42,5 +42,10 @@ export async function getOrCreateFcsTeam(ruleset: string) {
 // range 4-18 vs 3d6's 3-18).
 export function rollFcsRating(rand: Rand = Math.random) {
   const threeD6 = () => d6(rand) + d6(rand) + d6(rand);
-  return { offRating: threeD6(), defRating: threeD6() };
+  const offRating = threeD6();
+  const defRating = threeD6();
+  // FCS has no persisted powerElo (it isn't a real TeamSeason), so it needs a
+  // per-game stand-in for the elo-delta formulas' strength term -- its own
+  // combined off+def roll is the only "rating" it has.
+  return { offRating, defRating, powerElo: offRating + defRating };
 }

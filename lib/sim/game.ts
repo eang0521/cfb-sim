@@ -6,6 +6,13 @@ import { binomInv, possessionDie, type Rand } from "./rng";
 export interface TeamGameInput {
   offRating: number;
   defRating: number;
+  // The team's overall power rating entering this game -- drives the
+  // strength term in both awayEloDelta and neutralEloDelta. Optional only
+  // because the synthetic FCS opponent has no persisted rating and instead
+  // supplies an ad hoc stand-in each game (see rollFcsRating); every real
+  // team always has one, so this defaults to 0 purely for type-safety and
+  // that fallback should never actually be exercised.
+  powerElo?: number;
 }
 
 export interface GameResult {
@@ -89,16 +96,25 @@ function simulateOt(awayRate: number, homeRate: number, rand: Rand): { away: num
 }
 
 // SeasonGen!AO2 = 1 + SIGN(H-O)*15 + TRUNC((N-G)/10) + TRUNC((H-O)/5), where
-// H/O are the away/home scores and N/G are the home/away offense ratings.
-// This is always computed from the away team's perspective; home's change is
-// simply the negation (SeasonGen!AP2 = 0-AO2). Because of that, the formula
-// is NOT symmetric by winner: a win on the road nets 2 more rating points
-// than a win at home of the same margin/offense gap (and a loss at home
-// costs 2 fewer than the same loss on the road), and the offense-strength
-// term is always "home offense minus away offense" regardless of who wins.
-export function awayEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
+// H/O are the away/home scores. The workbook's N/G columns were pasted
+// OFFENSE ratings, but that was a porting mistake -- the live formula this
+// was meant to mirror grades the strength term off each side's overall power
+// rating ENTERING the game, not just its offense (a stout defense dragging a
+// team's rating up/down should matter here too). This is always computed
+// from the away team's perspective; home's change is simply the negation
+// (SeasonGen!AP2 = 0-AO2). Because of that, the formula is NOT symmetric by
+// winner: a win on the road nets 2 more rating points than a win at home of
+// the same margin/power-rating gap (and a loss at home costs 2 fewer than
+// the same loss on the road), and the strength term is always "home power
+// rating minus away power rating" regardless of who wins.
+export function awayEloDelta(
+  awayScore: number,
+  homeScore: number,
+  awayPowerElo: number,
+  homePowerElo: number
+): number {
   const margin = awayScore - homeScore;
-  return 1 + Math.sign(margin) * 15 + Math.trunc((homeOffense - awayOffense) / 10) + Math.trunc(margin / 5);
+  return 1 + Math.sign(margin) * 15 + Math.trunc((homePowerElo - awayPowerElo) / 10) + Math.trunc(margin / 5);
 }
 
 // Same formula, but evaluated from the WINNER's perspective instead of the
@@ -107,12 +123,17 @@ export function awayEloDelta(awayScore: number, homeScore: number, awayOffense: 
 // there's no real home-field edge to reflect on a neutral field, so neither
 // side should get the away-formula's road-win bonus or take the (equally
 // arbitrary) home-loss discount.
-export function neutralEloDelta(awayScore: number, homeScore: number, awayOffense: number, homeOffense: number): number {
+export function neutralEloDelta(
+  awayScore: number,
+  homeScore: number,
+  awayPowerElo: number,
+  homePowerElo: number
+): number {
   const margin = awayScore - homeScore;
   const awayWon = margin > 0;
-  const winnerOffense = awayWon ? awayOffense : homeOffense;
-  const loserOffense = awayWon ? homeOffense : awayOffense;
-  const winnerDelta = 1 + 15 + Math.trunc((winnerOffense - loserOffense) / 10) + Math.trunc(Math.abs(margin) / 5);
+  const winnerPowerElo = awayWon ? awayPowerElo : homePowerElo;
+  const loserPowerElo = awayWon ? homePowerElo : awayPowerElo;
+  const winnerDelta = 1 + 15 + Math.trunc((winnerPowerElo - loserPowerElo) / 10) + Math.trunc(Math.abs(margin) / 5);
   return awayWon ? winnerDelta : -winnerDelta;
 }
 
@@ -142,8 +163,8 @@ export function simulateGame(
   }
 
   const eloChangeAway = neutralSite
-    ? neutralEloDelta(awayScore, homeScore, away.offRating, home.offRating)
-    : awayEloDelta(awayScore, homeScore, away.offRating, home.offRating);
+    ? neutralEloDelta(awayScore, homeScore, away.powerElo ?? 0, home.powerElo ?? 0)
+    : awayEloDelta(awayScore, homeScore, away.powerElo ?? 0, home.powerElo ?? 0);
   const eloChangeHome = -eloChangeAway;
 
   return { awayScore, homeScore, otPeriods, eloChangeAway, eloChangeHome };
