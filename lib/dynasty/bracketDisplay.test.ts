@@ -69,6 +69,35 @@ describe("buildBracketDisplay (12-team)", () => {
     expect(qf.matches[2].home.team).toBeNull();
   });
 
+  it("resolves the final and champion even when every bye seed (1-4) loses its quarterfinal", () => {
+    // Regression test: a "winner of" slot must be identified by bracket
+    // POSITION, not by whether a fixed seed happens to survive into it --
+    // seeds 1-4 are guaranteed to appear in the quarterfinals (they're
+    // byes), but nothing guarantees they win, so none of them may appear in
+    // any later round at all.
+    const games: BracketGameInput[] = [
+      game({ id: "g1", round: "FIRST_ROUND", awayTeamId: "T8", homeTeamId: "T9", awayScore: 10, homeScore: 20, played: true }), // T9
+      game({ id: "g2", round: "FIRST_ROUND", awayTeamId: "T7", homeTeamId: "T10", awayScore: 10, homeScore: 30, played: true }), // T10
+      game({ id: "g3", round: "FIRST_ROUND", awayTeamId: "T6", homeTeamId: "T11", awayScore: 10, homeScore: 20, played: true }), // T11
+      game({ id: "g4", round: "FIRST_ROUND", awayTeamId: "T5", homeTeamId: "T12", awayScore: 10, homeScore: 20, played: true }), // T12
+      // Every bye seed (1-4) loses its quarterfinal.
+      game({ id: "qf1", round: "QUARTERFINAL", awayTeamId: "T1", homeTeamId: "T9", awayScore: 10, homeScore: 40, played: true }), // T9
+      game({ id: "qf2", round: "QUARTERFINAL", awayTeamId: "T2", homeTeamId: "T10", awayScore: 10, homeScore: 40, played: true }), // T10
+      game({ id: "qf3", round: "QUARTERFINAL", awayTeamId: "T3", homeTeamId: "T11", awayScore: 10, homeScore: 40, played: true }), // T11
+      game({ id: "qf4", round: "QUARTERFINAL", awayTeamId: "T4", homeTeamId: "T12", awayScore: 10, homeScore: 40, played: true }), // T12
+      // SF0: side1(T9) vs side4(T12) -- T9 wins. SF1: side2(T10) vs side3(T11) -- T10 wins.
+      game({ id: "sf1", round: "SEMIFINAL", awayTeamId: "T9", homeTeamId: "T12", awayScore: 30, homeScore: 20, played: true }),
+      game({ id: "sf2", round: "SEMIFINAL", awayTeamId: "T10", homeTeamId: "T11", awayScore: 25, homeScore: 24, played: true }),
+      game({ id: "final", round: "FINAL", awayTeamId: "T9", homeTeamId: "T10", awayScore: 21, homeScore: 17, played: true }),
+    ];
+    const display = buildBracketDisplay(12, seeds12(), games);
+    const final = display.laterRounds.find((r) => r.round === "FINAL")!.matches[0];
+    expect(final.away.team?.teamId).toBe("T9");
+    expect(final.home.team?.teamId).toBe("T10");
+    expect(final.away.winner).toBe(true);
+    expect(display.champion?.teamId).toBe("T9");
+  });
+
   it("resolves the champion once the final is played", () => {
     const games: BracketGameInput[] = [
       game({ id: "g1", round: "FIRST_ROUND", awayTeamId: "T8", homeTeamId: "T9", awayScore: 10, homeScore: 20, played: true }),
