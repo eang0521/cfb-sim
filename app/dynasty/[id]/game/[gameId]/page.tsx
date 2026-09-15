@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/db/client";
 import { ROUND_LABEL } from "@/app/roundLabels";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export default async function GamePage({
   params,
@@ -28,11 +29,17 @@ export default async function GamePage({
           {game.neutralSite ? " (neutral site)" : ""}
         </p>
         <div className="flex items-center justify-center gap-8 text-xl font-semibold">
-          <span>{game.awayTeam.name}</span>
+          <span className="flex flex-col items-center gap-2">
+            <TeamLogo name={game.awayTeam.name} className="h-12 w-12" />
+            {game.awayTeam.name}
+          </span>
           <span className="tabular-nums">
             {game.played ? `${game.awayScore} - ${game.homeScore}` : "vs"}
           </span>
-          <span>{game.homeTeam.name}</span>
+          <span className="flex flex-col items-center gap-2">
+            <TeamLogo name={game.homeTeam.name} className="h-12 w-12" />
+            {game.homeTeam.name}
+          </span>
         </div>
         {game.played && game.otPeriods > 0 && (
           <p className="mt-2 text-sm text-zinc-500">{game.otPeriods} overtime period(s)</p>

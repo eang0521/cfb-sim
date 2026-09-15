@@ -4,6 +4,7 @@ import { getCurrentSeason, getStandings } from "@/lib/dynasty/queries";
 import { prisma } from "@/lib/db/client";
 import { GREEDY_NATIONAL_BOWLS_144 } from "@/lib/data/bowls144";
 import { formatHeismanValue } from "@/lib/dynasty/heisman";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export default async function PlayoffPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -45,9 +46,11 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
 
   const gameLine = (g: (typeof postseasonGames)[number]) => (
     <li key={g.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-      <span>
-        {g.bowlName && <span className="mr-2 text-xs text-zinc-500">{g.bowlName}:</span>}
-        {g.awayTeam.name} @ {g.homeTeam.name}
+      <span className="inline-flex items-center gap-1.5">
+        {g.bowlName && <span className="mr-0.5 text-xs text-zinc-500">{g.bowlName}:</span>}
+        <TeamLogo name={g.awayTeam.name} />
+        {g.awayTeam.name} @ <TeamLogo name={g.homeTeam.name} />
+        {g.homeTeam.name}
       </span>
       <span className="tabular-nums text-zinc-600">
         {g.played ? `${g.awayScore} - ${g.homeScore}` : "—"}
@@ -88,8 +91,9 @@ export default async function PlayoffPage({ params }: { params: Promise<{ id: st
               const isChampion = championIds.includes(s.teamId);
               return (
                 <li key={s.teamId} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-                  <span>
-                    #{s.seed} {ts.team.name}
+                  <span className="inline-flex items-center gap-1.5">
+                    #{s.seed} <TeamLogo name={ts.team.name} />
+                    {ts.team.name}
                     {isChampion && <span className="ml-2 text-xs text-zinc-500">(conf. champion)</span>}
                   </span>
                   <span className="tabular-nums text-zinc-600">

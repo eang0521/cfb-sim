@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentSeason, getStandings } from "@/lib/dynasty/queries";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export default async function StandingsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -29,9 +30,10 @@ export default async function StandingsPage({ params }: { params: Promise<{ id: 
         <ol className="flex flex-col gap-1 text-sm">
           {standings.map((ts, i) => (
             <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-              <span>
+              <span className="flex items-center">
                 <span className="mr-2 w-6 tabular-nums text-zinc-400">{i + 1}.</span>
-                <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="hover:underline">
+                <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="flex items-center gap-1.5 hover:underline">
+                  <TeamLogo name={ts.team.name} />
                   {ts.team.name}
                 </Link>
                 <span className="ml-2 text-xs text-zinc-500">
@@ -67,7 +69,8 @@ export default async function StandingsPage({ params }: { params: Promise<{ id: 
                       .sort((a, b) => b.confWins - b.confLosses - (a.confWins - a.confLosses))
                       .map((ts) => (
                         <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-                          <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="hover:underline">
+                          <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="flex items-center gap-1.5 hover:underline">
+                            <TeamLogo name={ts.team.name} />
                             {ts.team.name}
                           </Link>
                           <span className="tabular-nums text-zinc-600">

@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentSeason, getSeasonHistorySummaries, type SeasonHistoryTeamRef } from "@/lib/dynasty/queries";
 import { formatHeismanValue } from "@/lib/dynasty/heisman";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 function TeamLink({ dynastyId, team }: { dynastyId: string; team: SeasonHistoryTeamRef }) {
   return (
-    <Link href={`/dynasty/${dynastyId}/teams?team=${team.teamId}`} className="hover:underline">
+    <Link href={`/dynasty/${dynastyId}/teams?team=${team.teamId}`} className="inline-flex items-center gap-1 hover:underline">
+      <TeamLogo name={team.name} />
       {team.name}
     </Link>
   );

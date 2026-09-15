@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/client";
 import { getCurrentSeason, getSeasonRosterSnapshot, getTeamHistory } from "@/lib/dynasty/queries";
 import { FCS_TEAM_NAME } from "@/lib/dynasty/fcsTeam";
 import { TeamSelect } from "@/app/components/TeamSelect";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export default async function TeamsPage({
   params,
@@ -52,7 +53,10 @@ export default async function TeamsPage({
       />
 
       <section className="flex flex-col gap-2">
-        <h2 className="font-semibold">{selectedTeam.name}</h2>
+        <h2 className="flex items-center gap-2 font-semibold">
+          <TeamLogo name={selectedTeam.name} className="h-6 w-6" />
+          {selectedTeam.name}
+        </h2>
 
         {history.length === 0 ? (
           <p className="text-sm text-zinc-400">No seasons played yet.</p>

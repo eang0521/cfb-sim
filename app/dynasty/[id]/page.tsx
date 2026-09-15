@@ -11,6 +11,7 @@ import {
 import { ROUND_LABEL } from "@/app/roundLabels";
 import { WeekGamesTable } from "@/app/components/WeekGamesTable";
 import { SimulationBar } from "@/app/components/SimulationBar";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export default async function DynastyPage({
   params,
@@ -146,9 +147,10 @@ export default async function DynastyPage({
         <ol className="flex flex-col gap-1 text-sm">
           {top25.map((ts, i) => (
             <li key={ts.id} className="flex items-center justify-between rounded px-2 py-1 odd:bg-zinc-50">
-              <span>
+              <span className="flex items-center">
                 <span className="mr-2 tabular-nums text-zinc-400">{i + 1}.</span>
-                <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="hover:underline">
+                <Link href={`/dynasty/${dynasty.id}/teams?team=${ts.teamId}`} className="flex items-center gap-1.5 hover:underline">
+                  <TeamLogo name={ts.team.name} />
                   {ts.team.name}
                 </Link>
                 <span className="ml-2 text-xs text-zinc-500">{ts.team.conference.code}</span>

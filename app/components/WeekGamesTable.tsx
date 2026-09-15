@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatRank, formatRecord, gameSideDisplay, RANKED_CUTOFF, type StandingsSnapshot } from "@/app/gameDisplay";
 import { ROUND_LABEL } from "@/app/roundLabels";
+import { TeamLogo } from "@/app/components/TeamLogo";
 
 export interface WeekGamesTableGame {
   id: string;
@@ -93,7 +94,8 @@ export function WeekGamesTable({
               )}
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(away.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/teams?team=${g.awayTeam.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/teams?team=${g.awayTeam.id}`} className="flex items-center gap-1.5 hover:underline">
+                  <TeamLogo name={g.awayTeam.name} />
                   {g.awayTeam.name}
                 </Link>
               </td>
@@ -101,7 +103,8 @@ export function WeekGamesTable({
               <td className="py-1 pr-3 text-zinc-400">{g.neutralSite ? "vs" : "@"}</td>
               <td className="py-1 pr-1 text-right tabular-nums text-zinc-500">{formatRank(home.rank)}</td>
               <td className="py-1 pr-2">
-                <Link href={`/dynasty/${dynastyId}/teams?team=${g.homeTeam.id}`} className="hover:underline">
+                <Link href={`/dynasty/${dynastyId}/teams?team=${g.homeTeam.id}`} className="flex items-center gap-1.5 hover:underline">
+                  <TeamLogo name={g.homeTeam.name} />
                   {g.homeTeam.name}
                 </Link>
               </td>
