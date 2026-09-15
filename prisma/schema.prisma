@@ -65,10 +65,18 @@ model Dynasty {
   ruleset            String   @default("CLASSIC")
   createdAt          DateTime @default(now())
   currentSeasonNumber Int     @default(1)
+  // Per-machine isolation without a login system: a random id issued as an
+  // httpOnly cookie the first time a browser creates a dynasty (see
+  // lib/dynasty/machineId.ts). Every read/mutation checks this against the
+  // requesting browser's cookie, so dynasties are only ever visible to the
+  // machine that created them.
+  ownerId            String
   players            Player[]
   seasons            Season[]
   rosterMoves        RosterMove[]
   rosterSnapshots    PlayerSeasonSnapshot[]
+
+  @@index([ownerId])
 }
 
 // posGroup: QB | UT | OL | DL | LB | DB

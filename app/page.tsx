@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db/client";
+import { getMachineId } from "@/lib/dynasty/machineId";
 import { createDynastyAction } from "./actions";
 
 // This is the only route with no dynamic segment, so Next.js will otherwise
@@ -9,7 +10,13 @@ import { createDynastyAction } from "./actions";
 export const dynamic = "force-dynamic";
 
 export default async function HomePage() {
-  const dynasties = await prisma.dynasty.findMany({ orderBy: { createdAt: "desc" } });
+  // A browser with no machine-id cookie yet has never created a dynasty
+  // (the cookie is only ever set by createDynastyAction), so it owns
+  // nothing -- skip the query rather than querying for a null ownerId.
+  const machineId = await getMachineId();
+  const dynasties = machineId
+    ? await prisma.dynasty.findMany({ where: { ownerId: machineId }, orderBy: { createdAt: "desc" } })
+    : [];
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-8 px-6 py-16">

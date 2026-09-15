@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { sortByPosGroup } from "@/lib/sim/roster";
 import { FCS_TEAM_NAME } from "./fcsTeam";
+import { getMachineId } from "./machineId";
 
 export interface StandingsSnapshot {
   rank: number | null;
@@ -10,8 +11,25 @@ export interface StandingsSnapshot {
   powerElo: number;
 }
 
+// Every dynasty read/mutation funnels through here (or assertOwnsDynasty
+// below) to enforce per-machine isolation -- a dynasty is only visible to
+// the browser whose cookie created it. Throwing (rather than returning
+// false) matches the callers' existing `.catch(() => notFound())` pattern,
+// and deliberately doesn't distinguish "doesn't exist" from "not yours" so a
+// non-owner can't probe for valid ids.
+async function assertOwnedByThisMachine(dynasty: { ownerId: string }): Promise<void> {
+  const machineId = await getMachineId();
+  if (dynasty.ownerId !== machineId) throw new Error("Dynasty not found.");
+}
+
+export async function assertOwnsDynasty(dynastyId: string): Promise<void> {
+  const dynasty = await prisma.dynasty.findUniqueOrThrow({ where: { id: dynastyId } });
+  await assertOwnedByThisMachine(dynasty);
+}
+
 export async function getCurrentSeason(dynastyId: string) {
   const dynasty = await prisma.dynasty.findUniqueOrThrow({ where: { id: dynastyId } });
+  await assertOwnedByThisMachine(dynasty);
   const season = await prisma.season.findUniqueOrThrow({
     where: { dynastyId_number: { dynastyId, number: dynasty.currentSeasonNumber } },
   });

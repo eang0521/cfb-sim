@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
 import { createDynasty, type Ruleset } from "@/lib/dynasty/createDynasty";
+import { assertOwnsDynasty } from "@/lib/dynasty/queries";
+import { getOrCreateMachineId } from "@/lib/dynasty/machineId";
 import { simulateWeek } from "@/lib/dynasty/simulateWeek";
 import { advancePostseason, type PostseasonStepResult } from "@/lib/dynasty/postseason";
 import { runOffseason } from "@/lib/dynasty/runOffseason";
@@ -13,7 +15,8 @@ export async function createDynastyAction(formData: FormData) {
   if (!name) throw new Error("Dynasty name is required.");
   const rulesetInput = String(formData.get("ruleset") ?? "CLASSIC");
   const ruleset: Ruleset = rulesetInput === "MEGA144" ? "MEGA144" : "CLASSIC";
-  const dynasty = await createDynasty(name, ruleset);
+  const ownerId = await getOrCreateMachineId();
+  const dynasty = await createDynasty(name, ruleset, ownerId);
   redirect(`/dynasty/${dynasty.id}`);
 }
 
@@ -21,6 +24,7 @@ export async function createDynastyAction(formData: FormData) {
 // default of "whatever week is now current", which has already advanced)
 // so the user actually sees the results.
 export async function simulateWeekAction(dynastyId: string, seasonId: string) {
+  await assertOwnsDynasty(dynastyId);
   const season = await prisma.season.findUniqueOrThrow({ where: { id: seasonId } });
   const weekJustPlayed = season.currentWeek;
   await simulateWeek(seasonId);
@@ -37,12 +41,14 @@ const POSTSEASON_ROUND_WEEK: Record<string, number> = {
 };
 
 export async function advancePostseasonAction(dynastyId: string, seasonId: string) {
+  await assertOwnsDynasty(dynastyId);
   const result = await advancePostseason(seasonId);
   revalidatePath(`/dynasty/${dynastyId}`);
   redirect(`/dynasty/${dynastyId}?week=${POSTSEASON_ROUND_WEEK[result.round]}`);
 }
 
 export async function runOffseasonAction(dynastyId: string) {
+  await assertOwnsDynasty(dynastyId);
   await runOffseason(dynastyId);
   revalidatePath(`/dynasty/${dynastyId}`);
   redirect(`/dynasty/${dynastyId}?week=1`);
@@ -55,12 +61,14 @@ export async function runOffseasonAction(dynastyId: string) {
 // which for "simulate the rest of the season" over a network database can
 // run long enough to look frozen.
 export async function simulateWeekStepAction(dynastyId: string, seasonId: string) {
+  await assertOwnsDynasty(dynastyId);
   const result = await simulateWeek(seasonId);
   revalidatePath(`/dynasty/${dynastyId}`);
   return result;
 }
 
 export async function advancePostseasonStepAction(dynastyId: string, seasonId: string): Promise<PostseasonStepResult> {
+  await assertOwnsDynasty(dynastyId);
   const result = await advancePostseason(seasonId);
   revalidatePath(`/dynasty/${dynastyId}`);
   return result;

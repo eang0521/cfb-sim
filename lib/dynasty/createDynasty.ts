@@ -7,12 +7,12 @@ import { recomputeRankings } from "./simulateWeek";
 
 export type Ruleset = "CLASSIC" | "MEGA144";
 
-export async function createDynasty(name: string, ruleset: Ruleset = "CLASSIC") {
+export async function createDynasty(name: string, ruleset: Ruleset, ownerId: string) {
   const teams = await prisma.team.findMany({ where: { ruleset }, include: { conference: true, division: true } });
   const fcsTeam = await getOrCreateFcsTeam(ruleset);
 
   const dynasty = await prisma.dynasty.create({
-    data: { name, ruleset, currentSeasonNumber: 1 },
+    data: { name, ruleset, currentSeasonNumber: 1, ownerId },
   });
 
   const season = await prisma.season.create({
