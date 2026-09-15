@@ -1,6 +1,8 @@
 // Resolves a playoff field's persisted seeds + whatever bracket games exist
-// so far into a fully-drawn bracket shape (every slot present from the day
-// the field is set, filling in round by round as games are created/played).
+// so far into a fully-drawn, two-sided bracket shape (every slot present
+// from the day the field is set, filling in round by round as games are
+// created/played) -- one LEFT side and one RIGHT side, each narrowing
+// toward the FINAL in the middle, like a real tournament bracket.
 //
 // Round 1 (the first round actually shown -- FIRST_ROUND for the 12-team
 // MEGA144 field, QUARTERFINAL for the 6-team CLASSIC field) is always fully
@@ -20,6 +22,7 @@
 // computed.
 
 export type BracketRoundName = "FIRST_ROUND" | "QUARTERFINAL" | "SEMIFINAL" | "FINAL";
+export type BracketHalf = "left" | "right";
 
 export interface BracketTeamInfo {
   teamId: string;
@@ -54,36 +57,37 @@ interface MatchShape {
   round: BracketRoundName;
   away: Slot;
   home: Slot;
+  half: BracketHalf | "center"; // "center" only for FINAL
 }
 
 function isSeedSlot(slot: Slot): slot is SlotSeed {
   return "seed" in slot;
 }
 
-// First-round entries are deliberately ordered to pair 1:1 with BYE seeds
-// 1, 2, 3, ... (ascending) -- see buildFirstColumn below, which relies on
-// that correspondence to interleave "bye seed N" directly next to "the game
-// whose winner joins seed N in the next round".
+// Authored so every round's entries group left-half first, then right-half
+// -- byeFirstColumn below relies on each half's bye seeds and first-round
+// games appearing in the same relative (ascending-seed) order within their
+// half, so they interleave 1:1 without needing any extra bookkeeping.
 const SHAPE_12: MatchShape[] = [
-  { round: "FIRST_ROUND", away: { seed: 8 }, home: { seed: 9 } }, // index 0
-  { round: "FIRST_ROUND", away: { seed: 7 }, home: { seed: 10 } }, // index 1
-  { round: "FIRST_ROUND", away: { seed: 6 }, home: { seed: 11 } }, // index 2
-  { round: "FIRST_ROUND", away: { seed: 5 }, home: { seed: 12 } }, // index 3
-  { round: "QUARTERFINAL", away: { seed: 1 }, home: { round: "FIRST_ROUND", index: 0 } }, // index 0
-  { round: "QUARTERFINAL", away: { seed: 2 }, home: { round: "FIRST_ROUND", index: 1 } }, // index 1
-  { round: "QUARTERFINAL", away: { seed: 3 }, home: { round: "FIRST_ROUND", index: 2 } }, // index 2
-  { round: "QUARTERFINAL", away: { seed: 4 }, home: { round: "FIRST_ROUND", index: 3 } }, // index 3
-  { round: "SEMIFINAL", away: { round: "QUARTERFINAL", index: 0 }, home: { round: "QUARTERFINAL", index: 3 } }, // index 0
-  { round: "SEMIFINAL", away: { round: "QUARTERFINAL", index: 1 }, home: { round: "QUARTERFINAL", index: 2 } }, // index 1
-  { round: "FINAL", away: { round: "SEMIFINAL", index: 0 }, home: { round: "SEMIFINAL", index: 1 } },
+  { round: "FIRST_ROUND", away: { seed: 8 }, home: { seed: 9 }, half: "left" }, // index 0 -- feeds seed 1's quarterfinal
+  { round: "FIRST_ROUND", away: { seed: 5 }, home: { seed: 12 }, half: "left" }, // index 1 -- feeds seed 4's quarterfinal
+  { round: "FIRST_ROUND", away: { seed: 7 }, home: { seed: 10 }, half: "right" }, // index 2 -- feeds seed 2's quarterfinal
+  { round: "FIRST_ROUND", away: { seed: 6 }, home: { seed: 11 }, half: "right" }, // index 3 -- feeds seed 3's quarterfinal
+  { round: "QUARTERFINAL", away: { seed: 1 }, home: { round: "FIRST_ROUND", index: 0 }, half: "left" }, // index 0
+  { round: "QUARTERFINAL", away: { seed: 4 }, home: { round: "FIRST_ROUND", index: 1 }, half: "left" }, // index 1
+  { round: "QUARTERFINAL", away: { seed: 2 }, home: { round: "FIRST_ROUND", index: 2 }, half: "right" }, // index 2
+  { round: "QUARTERFINAL", away: { seed: 3 }, home: { round: "FIRST_ROUND", index: 3 }, half: "right" }, // index 3
+  { round: "SEMIFINAL", away: { round: "QUARTERFINAL", index: 0 }, home: { round: "QUARTERFINAL", index: 1 }, half: "left" }, // index 0
+  { round: "SEMIFINAL", away: { round: "QUARTERFINAL", index: 2 }, home: { round: "QUARTERFINAL", index: 3 }, half: "right" }, // index 1
+  { round: "FINAL", away: { round: "SEMIFINAL", index: 0 }, home: { round: "SEMIFINAL", index: 1 }, half: "center" },
 ];
 
 const SHAPE_6: MatchShape[] = [
-  { round: "QUARTERFINAL", away: { seed: 4 }, home: { seed: 5 } }, // index 0
-  { round: "QUARTERFINAL", away: { seed: 3 }, home: { seed: 6 } }, // index 1
-  { round: "SEMIFINAL", away: { seed: 1 }, home: { round: "QUARTERFINAL", index: 0 } }, // index 0
-  { round: "SEMIFINAL", away: { seed: 2 }, home: { round: "QUARTERFINAL", index: 1 } }, // index 1
-  { round: "FINAL", away: { round: "SEMIFINAL", index: 0 }, home: { round: "SEMIFINAL", index: 1 } },
+  { round: "QUARTERFINAL", away: { seed: 4 }, home: { seed: 5 }, half: "left" }, // index 0 -- feeds seed 1's semifinal
+  { round: "QUARTERFINAL", away: { seed: 3 }, home: { seed: 6 }, half: "right" }, // index 1 -- feeds seed 2's semifinal
+  { round: "SEMIFINAL", away: { seed: 1 }, home: { round: "QUARTERFINAL", index: 0 }, half: "left" }, // index 0
+  { round: "SEMIFINAL", away: { seed: 2 }, home: { round: "QUARTERFINAL", index: 1 }, half: "right" }, // index 1
+  { round: "FINAL", away: { round: "SEMIFINAL", index: 0 }, home: { round: "SEMIFINAL", index: 1 }, half: "center" },
 ];
 
 export interface BracketGameInput {
@@ -107,13 +111,20 @@ export interface BracketColumn {
   matches: BracketMatchDisplay[];
 }
 
-export interface BracketDisplay {
-  firstRound: BracketRoundName;
+export interface BracketHalfDisplay {
   // Every slot at the "entry level," in top-to-bottom display order, one
   // per bye seed interleaved with the game whose winner joins it next round.
   firstColumn: ({ type: "bye"; team: BracketTeamInfo } | { type: "game"; match: BracketMatchDisplay })[];
-  // Every round after the first, each already in top-to-bottom bracket order.
-  laterRounds: BracketColumn[];
+  // Rounds strictly between the first round and the final, for this half
+  // only, nearest-to-outside first (i.e. in the order they're played).
+  rounds: BracketColumn[];
+}
+
+export interface BracketDisplay {
+  firstRound: BracketRoundName;
+  left: BracketHalfDisplay;
+  right: BracketHalfDisplay;
+  final: BracketMatchDisplay;
   champion: BracketTeamInfo | null;
 }
 
@@ -161,6 +172,7 @@ export function buildBracketDisplay(
     return { team, score, winner: score > otherScore };
   }
 
+  // Parallel to `shape` -- matches[i] is the resolved display for shape[i].
   const matches: BracketMatchDisplay[] = [];
   for (const m of shape) {
     const index = indexInRound.get(m.round) ?? 0;
@@ -189,6 +201,16 @@ export function buildBracketDisplay(
     matchByKey.set(`${m.round}:${index}`, display);
   }
 
+  // A bye seed's half is wherever it appears as a direct seed slot (always
+  // exactly once, in the round right after the first).
+  const seedHalf = new Map<number, BracketHalf>();
+  for (const m of shape) {
+    if (m.half === "center") continue;
+    for (const slot of [m.away, m.home]) {
+      if (isSeedSlot(slot)) seedHalf.set(slot.seed, m.half);
+    }
+  }
+
   const firstRoundSeeds = new Set(
     shape
       .filter((m) => m.round === firstRound)
@@ -196,26 +218,37 @@ export function buildBracketDisplay(
       .filter(isSeedSlot)
       .map((s) => s.seed)
   );
-  const byes: BracketTeamInfo[] = seeds
+  const allByes: BracketTeamInfo[] = seeds
     .filter((s) => !firstRoundSeeds.has(s.seed))
     .sort((a, b) => a.seed - b.seed)
     .map((s) => ({ teamId: s.teamId, name: s.name, seed: s.seed }));
 
-  const firstRoundMatches = matches.filter((m) => m.round === firstRound);
-  const firstColumn: BracketDisplay["firstColumn"] = byes.flatMap((bye, i) => [
-    { type: "bye" as const, team: bye },
-    { type: "game" as const, match: firstRoundMatches[i] },
-  ]);
+  function buildHalf(half: BracketHalf): BracketHalfDisplay {
+    const byes = allByes.filter((b) => seedHalf.get(b.seed) === half);
+    const firstRoundMatches = shape
+      .map((m, i) => ({ m, match: matches[i] }))
+      .filter(({ m }) => m.round === firstRound && m.half === half)
+      .map(({ match }) => match);
 
-  const laterRoundNames = (fieldSize === 12 ? ["QUARTERFINAL", "SEMIFINAL", "FINAL"] : ["SEMIFINAL", "FINAL"]) as BracketRoundName[];
-  const laterRounds: BracketColumn[] = laterRoundNames.map((round) => ({
-    round,
-    matches: matches.filter((m) => m.round === round),
-  }));
+    const firstColumn: BracketHalfDisplay["firstColumn"] = byes.flatMap((bye, i) => [
+      { type: "bye" as const, team: bye },
+      { type: "game" as const, match: firstRoundMatches[i] },
+    ]);
 
-  const finalMatch = matches.find((m) => m.round === "FINAL")!;
-  const champion =
-    finalMatch.played && finalMatch.away.winner ? finalMatch.away.team : finalMatch.played && finalMatch.home.winner ? finalMatch.home.team : null;
+    const midRoundNames = (fieldSize === 12 ? ["QUARTERFINAL", "SEMIFINAL"] : ["SEMIFINAL"]) as BracketRoundName[];
+    const rounds: BracketColumn[] = midRoundNames.map((round) => ({
+      round,
+      matches: shape
+        .map((m, i) => ({ m, match: matches[i] }))
+        .filter(({ m }) => m.round === round && m.half === half)
+        .map(({ match }) => match),
+    }));
 
-  return { firstRound, firstColumn, laterRounds, champion };
+    return { firstColumn, rounds };
+  }
+
+  const final = matches[matches.length - 1];
+  const champion = final.played && final.away.winner ? final.away.team : final.played && final.home.winner ? final.home.team : null;
+
+  return { firstRound, left: buildHalf("left"), right: buildHalf("right"), final, champion };
 }
