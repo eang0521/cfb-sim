@@ -99,6 +99,7 @@ async function seedMega144() {
         startingPrestige: team.prestige,
         conferenceId: conferences.get(team.conf)!,
         divisionId: divisions.get(team.div)!,
+        rivalrySlot: team.rivalrySlot,
       },
       create: {
         ruleset: "MEGA144",
@@ -108,6 +109,7 @@ async function seedMega144() {
         startingPrestige: team.prestige,
         conferenceId: conferences.get(team.conf)!,
         divisionId: divisions.get(team.div)!,
+        rivalrySlot: team.rivalrySlot,
       },
     });
   }

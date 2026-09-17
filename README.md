@@ -5,8 +5,9 @@ A web port of a 72-team, 6-conference college football dynasty simulator origina
 6-team playoff, then roll into an offseason (aging, recruiting, prestige shifts) and repeat.
 
 A second, larger **ruleset** is also available when creating a dynasty: **MEGA144** (144 teams,
-12 conferences, a 12-team playoff) -- see "The MEGA144 ruleset" below. Every dynasty picks one
-ruleset at creation and stays on it; the two never mix.
+12 conferences, a 12-team playoff) -- see "The MEGA144 ruleset" below, now the default choice when
+starting a new dynasty. Every dynasty picks one ruleset at creation and stays on it; the two never
+mix.
 
 ## Getting started
 
@@ -111,23 +112,31 @@ appear on the site (`lib/sim/roster.ts#sortByPosGroup`).
 
 ## The MEGA144 ruleset
 
-Entirely invented for the app -- no spreadsheet ever modeled a league this size. 144 teams, 12
-conferences (`lib/data/teams144.ts`), same 2-divisions-of-6 shape as CLASSIC per conference.
-`Conference`/`Division`/`Team` all carry a `ruleset` column now (`CLASSIC` | `MEGA144`) since the
-two datasets reuse some of the same codes/abbreviations (e.g. both have a "B12" and an "ALA") --
-every dynasty is created under one ruleset and only ever sees that ruleset's teams.
+No spreadsheet ever modeled a league this size, but its shape is real: 144 teams, 12 conferences
+(`lib/data/teams144.ts`), each split into two named 6-team divisions the same way CLASSIC's
+conferences are, with every team's division/rivalry assignment given directly (a real conference
+realignment, not invented). `Conference`/`Division`/`Team` all carry a `ruleset` column now
+(`CLASSIC` | `MEGA144`) since the two datasets reuse some of the same codes/abbreviations (e.g.
+both have a "B12" and an "ALA") -- every dynasty is created under one ruleset and only ever sees
+that ruleset's teams.
 
 - **Prestige** is given directly per team (no `historicScore`-style scaling), and the end-of-season
-  conference-rank bonus is `[+3,+2,+2,+1,+1,0,0,-1,-1,-2,-2,-3]` across the 12 conferences.
-- **Regular season** (`lib/sim/schedule144.ts`): weeks 4/6/8/10/12 are the division round robin,
-  weeks 7/9/11 are non-division conference games (3 of the 6 possible cross-division opponents,
-  alternating to the other 3 every year). Every team gets **exactly** 4 home / 4 away across
-  those 8 games, every season, guaranteed by an Eulerian-circuit graph orientation
-  (`lib/sim/eulerianCircuit.ts` -- a graph where every vertex has even degree always admits an
-  orientation with equal in/out degree at each vertex; walking an Eulerian circuit and orienting
-  along the walk is the classical construction). Host alternation for a repeat pairing is applied
-  on top as a *best-effort* bias sourced from this dynasty's actual game history -- the exact 4-4
-  split always wins if the two ever conflict.
+  conference bonus is a fixed per-conference value (`CONFERENCE_BONUS_MEGA144` in
+  `lib/sim/prestige.ts`) rather than something re-ranked by that season's results -- a conference's
+  standing doesn't move no matter how its teams' games go.
+- **Regular season** (`lib/sim/schedule144.ts`): every team carries a `rivalrySlot` (0-11, its
+  letter A-L in the given rivalry order, not reset per division), and weeks 4/6/7/8/9/10/11/12 are
+  driven entirely by two lookup tables ported directly from the source spreadsheet, keyed only by
+  the season number -- no history-tracking or host-alternation heuristics needed. Weeks 4/6/8/10
+  are the division round robin (`D_TABLE`'s 4 categories, together with week 12's fixed rivalry
+  pairing (`DR`, always consecutive slots -- 0-1, 2-3, 4-5) forming the complete 6-team-division
+  round robin); which category lands on which week, and which of the two host orientations
+  (alternating by season parity) applies, are both season-number formulas. Weeks 7/9/11 are
+  non-division conference games (`C_TABLE`'s 3 categories, each with 4 seasonal variants that
+  together cover a team's other 6 conference-mates over a 4-season cycle); again, which category
+  lands on which week is a season-number formula. Home/away balances to within 1 of the ideal 4 in
+  any single season, and exactly 4-4 over any two consecutive seasons (verified directly, not
+  independently guaranteed the way it was under an earlier from-scratch scheme).
 - **Weeks 1/3/5** are a cross-conference block schedule: the 12 conferences are shuffled into a
   fresh order every season, Week 1 pairs them (1v2, 3v4, ..., 11v12) and Week 3 shifts the pairing
   by one (2v3, 4v5, ..., 12v1) -- between the two, every conference hosts exactly once and travels

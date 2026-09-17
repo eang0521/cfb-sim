@@ -13,8 +13,8 @@ import { runOffseason } from "@/lib/dynasty/runOffseason";
 export async function createDynastyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) throw new Error("Dynasty name is required.");
-  const rulesetInput = String(formData.get("ruleset") ?? "CLASSIC");
-  const ruleset: Ruleset = rulesetInput === "MEGA144" ? "MEGA144" : "CLASSIC";
+  const rulesetInput = String(formData.get("ruleset") ?? "MEGA144");
+  const ruleset: Ruleset = rulesetInput === "CLASSIC" ? "CLASSIC" : "MEGA144";
   const ownerId = await getOrCreateMachineId();
   const dynasty = await createDynasty(name, ruleset, ownerId);
   redirect(`/dynasty/${dynasty.id}`);

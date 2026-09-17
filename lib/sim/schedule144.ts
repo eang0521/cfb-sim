@@ -1,12 +1,10 @@
 // Regular-season schedule generator for the MEGA144 ruleset (12 conferences,
-// 2 divisions of 6 teams each, 144 teams total). This ruleset didn't exist in
-// the original workbook -- every rule here comes directly from the user's
-// own specification, not a ported formula.
+// 2 divisions of 6 teams each, 144 teams total).
 //
 //   week1  = cross-conference block (see crossConferenceWeeks144)
 //   week2  = F (FCS cupcake), same mechanic as CLASSIC
 //   week3  = cross-conference block
-//   week4  = division
+//   week4  = division (see below)
 //   week5  = cross-conference block
 //   week6  = division
 //   week7  = non-division conference
@@ -14,31 +12,114 @@
 //   week9  = non-division conference
 //   week10 = division
 //   week11 = non-division conference
-//   week12 = division
+//   week12 = division -- ALWAYS the fixed rivalry ("DR") pairing
 //
-// Weeks 4/6/8/10/12 (5 division games) + weeks 7/9/11 (3 non-division
-// conference games) are guaranteed EXACTLY 4 home / 4 away per team, every
-// season, via lib/sim/eulerianCircuit.ts -- see that file for why. Host
-// ALTERNATION for a recurring pairing (every season for division, every 2
-// seasons for non-division conference opponents, since those rotate through
-// 2 alternating groups of 3) is then applied as a best-effort bias on top of
-// that exact split, sourced from this dynasty's own most recent meeting
-// between the two teams -- when the two goals conflict, the exact 4-4 split
-// always wins (confirmed with the user).
+// Weeks 1/2/3/5 are untouched (unrelated cross-conference/FCS mechanics --
+// see crossConferenceWeeks144 and generateRegularSeasonSchedule144).
+//
+// Weeks 4/6/7/8/9/10/11/12 are ported directly from the user's own
+// spreadsheet (`CFB Sim 2_3_2026 (144 teams).xlsx`, Sheet2: the week-formula
+// table at BT2:BU15, the cross-division "C" games at A115:AI121, and the
+// division "D"/"DR" games at A153:AC159) -- fully deterministic lookup
+// tables keyed only by the season number, no history-tracking or heuristics
+// needed. This replaces an earlier from-scratch Eulerian-circuit-based
+// scheme that had no concept of a specific rivalry pairing at all (division
+// mates were just alphabetically ordered and round-robin'd), which is why a
+// fixed rivalry like Oregon-Cal always landed on the same host -- there was
+// nothing in that scheme that could express "this pairing should alternate
+// against ITS specific history" beyond a best-effort bias.
+//
+// Every team carries a `rivalrySlot` 0-11 (see lib/data/teams144.ts): its
+// letter A-L in the user's given rivalry order, NOT reset per division (0-5
+// = the conference's first-listed division, 6-11 = its second). Both tables
+// below are expressed purely in these slot numbers and already cover an
+// entire conference's 6 pairs per category/variant in one flat list (i.e.
+// they don't need to be applied "per division" separately -- e.g. D1 already
+// contains 3 division-1 pairs and 3 division-2 pairs together).
+//
+// D_TABLE (weeks 4/6/8/10/12): its 5 categories (D1-D4, DR) are the complete
+// round-robin for a 6-team division -- verified directly against the sheet:
+// together they cover all 15 unique pairs among {slot 0..5} (and,
+// identically, {slot 6..11}) exactly once. Which category lands on which
+// week is a season-number formula; DR -- always the fixed rivalry pairing,
+// consecutive slots 0-1/2-3/4-5 (and 6-7/8-9/10-11) -- is always week 12.
+// Host alternates by season parity (every pairing has an odd/even variant).
+//
+// C_TABLE (weeks 7/9/11): its 3 categories (C1-C3) are the cross-division
+// pairings; each has 4 seasonal variants (the sheet's "(k/4)" columns) that
+// together give a team all 6 of its cross-division opponents over a
+// 4-season cycle. Which category lands on which week, and which of its 4
+// variants applies, are both season-number formulas.
 
-import { bipartiteRoundRobin, byName, circleRoundRobin } from "./schedule";
+import { byName } from "./schedule";
 import type { ScheduleTeam, ScheduledGame } from "./schedule";
-import { findEulerianOrientation, type EulerianEdge } from "./eulerianCircuit";
 import type { Rand } from "./rng";
 
 export type { ScheduleTeam, ScheduledGame };
 
-const DIVISION_WEEKS = [4, 6, 8, 10, 12];
-const CONFERENCE_WEEKS = [7, 9, 11];
+export interface ScheduleTeam144 extends ScheduleTeam {
+  rivalrySlot: number; // 0-11 -- see lib/data/teams144.ts
+}
 
 function pairKey(a: string, b: string): string {
   return [a, b].sort().join("|");
 }
+
+// Excel's MOD always returns a result with the same sign as (i.e. in
+// [0, n) for a positive) the divisor; JS's `%` can return negative for a
+// negative dividend, so every port of one of the sheet's MOD(...) formulas
+// needs this instead of a raw `%`.
+function mod(x: number, n: number): number {
+  return ((x % n) + n) % n;
+}
+
+// [away, home] rivalrySlot pairs, ported verbatim from Sheet2 A115:AI121.
+// Indexed [category][variant 0-3], variant = mod(season - 1, 4).
+const C_TABLE: Record<"C1" | "C2" | "C3", [number, number][][]> = {
+  C1: [
+    [[0, 6], [7, 1], [2, 8], [9, 3], [4, 10], [11, 5]],
+    [[10, 0], [11, 1], [2, 6], [7, 3], [8, 4], [5, 9]],
+    [[6, 0], [1, 7], [8, 2], [3, 9], [10, 4], [5, 11]],
+    [[0, 10], [1, 11], [6, 2], [3, 7], [4, 8], [9, 5]],
+  ],
+  C2: [
+    [[0, 11], [6, 1], [2, 7], [8, 3], [4, 9], [10, 5]],
+    [[8, 0], [1, 9], [10, 2], [3, 11], [6, 4], [5, 7]],
+    [[11, 0], [1, 6], [7, 2], [3, 8], [9, 4], [5, 10]],
+    [[0, 8], [9, 1], [2, 10], [11, 3], [4, 6], [7, 5]],
+  ],
+  C3: [
+    [[9, 0], [1, 10], [11, 2], [3, 6], [7, 4], [5, 8]],
+    [[0, 7], [1, 8], [9, 2], [3, 10], [4, 11], [6, 5]],
+    [[0, 9], [10, 1], [2, 11], [6, 3], [4, 7], [8, 5]],
+    [[7, 0], [8, 1], [2, 9], [10, 3], [11, 4], [5, 6]],
+  ],
+};
+
+// [away, home] rivalrySlot pairs, ported verbatim from Sheet2 A153:AC159.
+// odd/even keyed by `mod(season, 2) === 1`.
+const D_TABLE: Record<"D1" | "D2" | "D3" | "D4" | "DR", { odd: [number, number][]; even: [number, number][] }> = {
+  D1: { odd: [[0, 5], [3, 1], [4, 2], [6, 11], [9, 7], [10, 8]], even: [[5, 0], [1, 3], [2, 4], [11, 6], [7, 9], [8, 10]] },
+  D2: { odd: [[2, 0], [5, 1], [3, 4], [8, 6], [11, 7], [9, 10]], even: [[0, 2], [1, 5], [4, 3], [6, 8], [7, 11], [10, 9]] },
+  D3: { odd: [[0, 3], [1, 4], [2, 5], [6, 9], [7, 10], [8, 11]], even: [[3, 0], [4, 1], [5, 2], [9, 6], [10, 7], [11, 8]] },
+  D4: { odd: [[4, 0], [1, 2], [5, 3], [10, 6], [7, 8], [11, 9]], even: [[0, 4], [2, 1], [3, 5], [6, 10], [8, 7], [9, 11]] },
+  DR: { odd: [[1, 0], [3, 2], [5, 4], [7, 6], [9, 8], [11, 10]], even: [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9], [10, 11]] },
+};
+
+// Sheet2 BU7/BU9/BU11/BU13: week -> [offset into "D" + mod4(T - offset) + 1].
+const D_WEEK_OFFSETS: [number, number][] = [
+  [4, 1],
+  [6, 4],
+  [8, 3],
+  [10, 2],
+];
+
+// Sheet2 BU10/BU12/BU14: week -> [offset into "C" + mod3(season + offset) + 1].
+const C_WEEK_OFFSETS: [number, number][] = [
+  [7, -1],
+  [9, 0],
+  [11, 1],
+];
 
 // Pairs up every item in `order` (processing the best-ranked item first,
 // matching it to the best-ranked available item it isn't `forbidden` with --
@@ -118,10 +199,6 @@ export interface Schedule144Input {
   // This season's Prestige per team (feeds the week-5 conference-average
   // ranking).
   currentSeasonPrestige: Map<string, number>;
-  // The most recent PAST division/non-division-conference game's host for a
-  // given team pair (pairKey(teamA, teamB) -> host team id), across this
-  // dynasty's whole history. Absent = first-ever meeting, no preference.
-  priorMeetingHost: Map<string, string>;
   // Total career week-5 cross-conference home-game count per conference
   // code, across this dynasty's history. Fewest-hosts-so-far gets the home
   // game this time (tie -> random).
@@ -154,73 +231,44 @@ function rankWithinConference144(confTeams: ScheduleTeam[], input: Schedule144In
   });
 }
 
-// Weeks 4/6/8/10/12 (division) + 7/9/11 (non-division conference), built and
-// oriented independently per conference (conferences never share opponents).
-function divisionAndConferenceWeeks144(
-  teams: ScheduleTeam[],
-  seasonNumber: number,
-  input: Schedule144Input
-): ScheduledGame[] {
+// Weeks 4/6/8/10/12 (division) + 7/9/11 (non-division conference), built
+// independently per conference straight from the two lookup tables above.
+function divisionAndConferenceWeeks144(teams: ScheduleTeam144[], seasonNumber: number): ScheduledGame[] {
   const games: ScheduledGame[] = [];
-  const byConference = new Map<string, ScheduleTeam[]>();
+  const byConference = new Map<string, ScheduleTeam144[]>();
   for (const t of teams) {
     if (!byConference.has(t.conferenceCode)) byConference.set(t.conferenceCode, []);
     byConference.get(t.conferenceCode)!.push(t);
   }
 
+  const isOddSeason = mod(seasonNumber, 2) === 1;
+  const T = (seasonNumber * (seasonNumber + 3)) / 2;
+  const cVariantIndex = mod(seasonNumber - 1, 4);
+
   for (const confTeams of byConference.values()) {
-    const byDivision = new Map<string, ScheduleTeam[]>();
-    for (const t of confTeams) {
-      if (!byDivision.has(t.divisionCode)) byDivision.set(t.divisionCode, []);
-      byDivision.get(t.divisionCode)!.push(t);
-    }
-    const [divA, divB] = [...byDivision.values()];
-    if (!divA || !divB) continue;
+    const bySlot = new Map(confTeams.map((t) => [t.rivalrySlot, t]));
+    const teamAt = (slot: number) => bySlot.get(slot)!;
 
-    const orderedA = divA.slice().sort(byName);
-    const orderedB = divB.slice().sort(byName);
-
-    const edges: EulerianEdge[] = [];
-    const edgeMeta = new Map<string, { category: "division" | "conference"; roundIndex: number }>();
-    let edgeCounter = 0;
-
-    // Division round-robin: fixed forever, every season plays all 5
-    // division-mates (weeks 4/6/8/10/12).
-    for (const div of [orderedA, orderedB]) {
-      circleRoundRobin(div).forEach((round, roundIndex) => {
-        for (const [a, b] of round) {
-          const id = `d${edgeCounter++}`;
-          edges.push({ id, a: a.id, b: b.id });
-          edgeMeta.set(id, { category: "division", roundIndex });
-        }
-      });
-    }
-
-    // Non-division conference opponents: 6 possible rounds, split into 2
-    // groups of 3 -- odd seasons play group A (rounds 0-2), even seasons
-    // play group B (rounds 3-5), covering all 6 possible opponents every 2
-    // seasons ("alternates every year").
-    const allConfRounds = bipartiteRoundRobin(orderedA, orderedB);
-    const activeGroup = seasonNumber % 2 === 1 ? allConfRounds.slice(0, 3) : allConfRounds.slice(3, 6);
-    activeGroup.forEach((round, roundIndex) => {
-      for (const [a, b] of round) {
-        const id = `c${edgeCounter++}`;
-        edges.push({ id, a: a.id, b: b.id });
-        edgeMeta.set(id, { category: "conference", roundIndex });
+    for (const [week, offset] of D_WEEK_OFFSETS) {
+      const category = `D${mod(T - offset, 4) + 1}` as keyof typeof D_TABLE;
+      const pairs = isOddSeason ? D_TABLE[category].odd : D_TABLE[category].even;
+      for (const [awaySlot, homeSlot] of pairs) {
+        games.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
       }
-    });
-
-    const preferredHost = new Map<string, string>();
-    for (const e of edges) {
-      const host = input.priorMeetingHost.get(pairKey(e.a, e.b));
-      if (host) preferredHost.set(e.id, host);
     }
 
-    const oriented = findEulerianOrientation(edges, preferredHost);
-    for (const o of oriented) {
-      const meta = edgeMeta.get(o.id)!;
-      const week = meta.category === "division" ? DIVISION_WEEKS[meta.roundIndex] : CONFERENCE_WEEKS[meta.roundIndex];
-      games.push({ week, awayTeamId: o.away, homeTeamId: o.home });
+    // Week 12: always the fixed rivalry pairing (DR), host by season parity.
+    const drPairs = isOddSeason ? D_TABLE.DR.odd : D_TABLE.DR.even;
+    for (const [awaySlot, homeSlot] of drPairs) {
+      games.push({ week: 12, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
+    }
+
+    for (const [week, offset] of C_WEEK_OFFSETS) {
+      const category = `C${mod(seasonNumber + offset, 3) + 1}` as keyof typeof C_TABLE;
+      const pairs = C_TABLE[category][cVariantIndex];
+      for (const [awaySlot, homeSlot] of pairs) {
+        games.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
+      }
     }
   }
 
@@ -307,7 +355,7 @@ function crossConferenceWeeks144(teams: ScheduleTeam[], input: Schedule144Input,
 }
 
 export function generateRegularSeasonSchedule144(
-  teams: ScheduleTeam[],
+  teams: ScheduleTeam144[],
   fcsTeamId: string,
   seasonNumber: number,
   input: Schedule144Input,
@@ -315,7 +363,7 @@ export function generateRegularSeasonSchedule144(
 ): ScheduledGame[] {
   const games: ScheduledGame[] = [
     ...crossConferenceWeeks144(teams, input, rand),
-    ...divisionAndConferenceWeeks144(teams, seasonNumber, input),
+    ...divisionAndConferenceWeeks144(teams, seasonNumber),
   ];
 
   // Week 2: FCS cupcake, always a home game for the real team -- same

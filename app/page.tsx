@@ -45,12 +45,12 @@ export default async function HomePage() {
         </div>
         <fieldset className="flex gap-4 text-sm text-zinc-600">
           <label className="flex items-center gap-1.5">
-            <input type="radio" name="ruleset" value="CLASSIC" defaultChecked />
-            72 Teams (Classic)
+            <input type="radio" name="ruleset" value="MEGA144" defaultChecked />
+            144 Teams
           </label>
           <label className="flex items-center gap-1.5">
-            <input type="radio" name="ruleset" value="MEGA144" />
-            144 Teams
+            <input type="radio" name="ruleset" value="CLASSIC" />
+            72 Teams (Classic)
           </label>
         </fieldset>
       </form>

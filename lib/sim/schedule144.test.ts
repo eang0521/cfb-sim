@@ -1,32 +1,33 @@
 import { describe, expect, it } from "vitest";
-import { generateRegularSeasonSchedule144, type Schedule144Input, type ScheduleTeam } from "./schedule144";
+import { generateRegularSeasonSchedule144, type Schedule144Input, type ScheduleTeam144 } from "./schedule144";
 
 const CONFERENCES = ["SEC", "B1G", "P12", "ACC", "B12", "BEC", "SBT", "MAC", "MWC", "AAC", "SWC", "SKY"];
 
-function buildTeams(): ScheduleTeam[] {
-  const teams: ScheduleTeam[] = [];
+// rivalrySlot 0-5 = the conference's first division ("A"), 6-11 = its
+// second ("B") -- matches lib/data/teams144.ts's convention.
+function buildTeams(): ScheduleTeam144[] {
+  const teams: ScheduleTeam144[] = [];
   for (const conf of CONFERENCES) {
-    for (const divSuffix of ["A", "B"]) {
-      for (let i = 0; i < 6; i++) {
-        teams.push({
-          id: `${conf}-${divSuffix}-${i}`,
-          name: `${conf}-${divSuffix}-${i}`,
-          conferenceCode: conf,
-          divisionCode: `${conf}${divSuffix}`,
-        });
-      }
+    for (let slot = 0; slot < 12; slot++) {
+      const divSuffix = slot < 6 ? "A" : "B";
+      teams.push({
+        id: `${conf}-${slot}`,
+        name: `${conf}-${slot}`,
+        conferenceCode: conf,
+        divisionCode: `${conf}${divSuffix}`,
+        rivalrySlot: slot,
+      });
     }
   }
   return teams;
 }
 
-function emptyInput(teams: ScheduleTeam[]): Schedule144Input {
+function emptyInput(teams: ScheduleTeam144[]): Schedule144Input {
   return {
     priorConfRecord: new Map(),
     priorHeadToHead: new Map(),
     startingPrestige: new Map(teams.map((t) => [t.id, 0])),
     currentSeasonPrestige: new Map(teams.map((t) => [t.id, 0])),
-    priorMeetingHost: new Map(),
     week5HistoricalHostCounts: new Map(),
   };
 }
@@ -45,6 +46,7 @@ function mulberry32(seed: number) {
 }
 
 const teams = buildTeams();
+const teamById = new Map(teams.map((t) => [t.id, t]));
 const fcsId = "FCS";
 
 describe("generateRegularSeasonSchedule144", () => {
@@ -99,7 +101,6 @@ describe("generateRegularSeasonSchedule144", () => {
 
   it("keeps every team's division opponents within its own division", () => {
     const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(3));
-    const teamById = new Map(teams.map((t) => [t.id, t]));
     const divisionWeeks = new Set([4, 6, 8, 10, 12]);
     for (const g of games) {
       if (!divisionWeeks.has(g.week)) continue;
@@ -109,7 +110,6 @@ describe("generateRegularSeasonSchedule144", () => {
 
   it("keeps every team's non-division conference opponents cross-division, same conference", () => {
     const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(4));
-    const teamById = new Map(teams.map((t) => [t.id, t]));
     const conferenceWeeks = new Set([7, 9, 11]);
     for (const g of games) {
       if (!conferenceWeeks.has(g.week)) continue;
@@ -120,24 +120,46 @@ describe("generateRegularSeasonSchedule144", () => {
     }
   });
 
-  it("gives every team exactly 4 home / 4 away among its 8 division+conference games, across many seasons", () => {
+  // Unlike the from-scratch scheme this replaced (which used an
+  // Eulerian-circuit orientation specifically to GUARANTEE exact 4-4 every
+  // single season), the ported spreadsheet tables only balance home/away
+  // to within +/-1 in any given season -- but exactly 8 home / 8 away over
+  // any two CONSECUTIVE seasons, every time (confirmed by direct simulation
+  // before writing this test).
+  function homeAwayCounts(season: number, seed: number) {
+    const games = generateRegularSeasonSchedule144(teams, fcsId, season, emptyInput(teams), mulberry32(seed));
+    const fixedWeeks = new Set([4, 6, 7, 8, 9, 10, 11, 12]);
+    const home = new Map<string, number>();
+    const away = new Map<string, number>();
+    for (const t of teams) {
+      home.set(t.id, 0);
+      away.set(t.id, 0);
+    }
+    for (const g of games) {
+      if (!fixedWeeks.has(g.week)) continue;
+      home.set(g.homeTeamId, (home.get(g.homeTeamId) ?? 0) + 1);
+      away.set(g.awayTeamId, (away.get(g.awayTeamId) ?? 0) + 1);
+    }
+    return { home, away };
+  }
+
+  it("keeps every team's home count among its 8 division+conference games within 1 of the ideal 4, every season", () => {
     for (let season = 1; season <= 10; season++) {
-      const games = generateRegularSeasonSchedule144(teams, fcsId, season, emptyInput(teams), mulberry32(100 + season));
-      const fixedWeeks = new Set([4, 6, 7, 8, 9, 10, 11, 12]);
-      const homeCount = new Map<string, number>();
-      const awayCount = new Map<string, number>();
+      const { home, away } = homeAwayCounts(season, 100 + season);
       for (const t of teams) {
-        homeCount.set(t.id, 0);
-        awayCount.set(t.id, 0);
+        expect(Math.abs(home.get(t.id)! - 4), `season ${season} team ${t.id} home`).toBeLessThanOrEqual(1);
+        expect(home.get(t.id)! + away.get(t.id)!).toBe(8);
       }
-      for (const g of games) {
-        if (!fixedWeeks.has(g.week)) continue;
-        homeCount.set(g.homeTeamId, (homeCount.get(g.homeTeamId) ?? 0) + 1);
-        awayCount.set(g.awayTeamId, (awayCount.get(g.awayTeamId) ?? 0) + 1);
-      }
+    }
+  });
+
+  it("gives every team EXACTLY 8 home / 8 away across any two consecutive seasons' division+conference games", () => {
+    for (let season = 1; season <= 9; season += 2) {
+      const s1 = homeAwayCounts(season, 300 + season);
+      const s2 = homeAwayCounts(season + 1, 300 + season + 1);
       for (const t of teams) {
-        expect(homeCount.get(t.id), `season ${season} team ${t.id} home`).toBe(4);
-        expect(awayCount.get(t.id), `season ${season} team ${t.id} away`).toBe(4);
+        const combinedHome = s1.home.get(t.id)! + s2.home.get(t.id)!;
+        expect(combinedHome, `seasons ${season}/${season + 1} team ${t.id}`).toBe(8);
       }
     }
   });
@@ -169,8 +191,56 @@ describe("generateRegularSeasonSchedule144", () => {
     expect(combined.size).toBe(6);
   });
 
+  it("always plays the fixed rivalry pairing (consecutive rivalrySlots) in week 12", () => {
+    for (let season = 1; season <= 6; season++) {
+      const games = generateRegularSeasonSchedule144(teams, fcsId, season, emptyInput(teams), mulberry32(400 + season));
+      const week12 = games.filter((g) => g.week === 12);
+      for (const g of week12) {
+        const away = teamById.get(g.awayTeamId)!;
+        const home = teamById.get(g.homeTeamId)!;
+        const [lo, hi] = [away.rivalrySlot, home.rivalrySlot].sort((a, b) => a - b);
+        expect(lo % 2, `season ${season} ${away.id} vs ${home.id}`).toBe(0);
+        expect(hi).toBe(lo + 1);
+      }
+    }
+  });
+
+  it("flips the week-12 rivalry host between consecutive seasons", () => {
+    const games1 = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(7));
+    const games2 = generateRegularSeasonSchedule144(teams, fcsId, 2, emptyInput(teams), mulberry32(8));
+    const hostOf = (games: { week: number; awayTeamId: string; homeTeamId: string }[], teamId: string) =>
+      games.find((g) => g.week === 12 && (g.awayTeamId === teamId || g.homeTeamId === teamId))!.homeTeamId;
+
+    for (const t of teams) {
+      const host1 = hostOf(games1, t.id);
+      const host2 = hostOf(games2, t.id);
+      expect(host1).not.toBe(host2);
+    }
+  });
+
+  it("plays every division-mate exactly once across weeks 4/6/8/10/12 (the D1-D4+DR round robin), every season", () => {
+    for (let season = 1; season <= 4; season++) {
+      const games = generateRegularSeasonSchedule144(teams, fcsId, season, emptyInput(teams), mulberry32(500 + season));
+      const divisionWeeks = new Set([4, 6, 8, 10, 12]);
+      const opponentsByTeam = new Map<string, Set<string>>();
+      for (const t of teams) opponentsByTeam.set(t.id, new Set());
+      for (const g of games) {
+        if (!divisionWeeks.has(g.week)) continue;
+        opponentsByTeam.get(g.awayTeamId)!.add(g.homeTeamId);
+        opponentsByTeam.get(g.homeTeamId)!.add(g.awayTeamId);
+      }
+      for (const t of teams) {
+        const divisionMates = teams.filter((o) => o.divisionCode === t.divisionCode && o.id !== t.id);
+        expect(opponentsByTeam.get(t.id)!.size, `season ${season} team ${t.id}`).toBe(5);
+        for (const mate of divisionMates) {
+          expect(opponentsByTeam.get(t.id)!.has(mate.id), `season ${season} ${t.id} vs ${mate.id}`).toBe(true);
+        }
+      }
+    }
+  });
+
   it("produces exactly 72 games each in weeks 1/3/5 with no duplicate pairing across them", () => {
-    const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(7));
+    const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(9));
     for (const week of [1, 3, 5]) {
       const weekGames = games.filter((g) => g.week === week);
       expect(weekGames).toHaveLength(72);
@@ -184,7 +254,7 @@ describe("generateRegularSeasonSchedule144", () => {
   });
 
   it("gives every team exactly one game in each of weeks 1, 3, and 5", () => {
-    const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(8));
+    const games = generateRegularSeasonSchedule144(teams, fcsId, 1, emptyInput(teams), mulberry32(10));
     for (const week of [1, 3, 5]) {
       const seen = new Set<string>();
       for (const g of games.filter((g) => g.week === week)) {
@@ -213,20 +283,15 @@ describe("generateRegularSeasonSchedule144", () => {
     }
   });
 
-  it("does not crash and still balances 4-4 when using the last-season ranking + head-to-head tiebreak", () => {
+  it("does not crash and still balances weeks 1/3/5 when using the last-season ranking + head-to-head tiebreak", () => {
     const input = emptyInput(teams);
     for (const t of teams) {
       input.priorConfRecord.set(t.id, { confWins: Math.floor(Math.random() * 6), confLosses: Math.floor(Math.random() * 6), powerElo: Math.random() * 100 });
     }
-    const games = generateRegularSeasonSchedule144(teams, fcsId, 3, input, mulberry32(9));
+    const games = generateRegularSeasonSchedule144(teams, fcsId, 3, input, mulberry32(11));
     expect(games.length).toBeGreaterThan(0);
-    const fixedWeeks = new Set([4, 6, 7, 8, 9, 10, 11, 12]);
-    const homeCount = new Map<string, number>();
-    for (const t of teams) homeCount.set(t.id, 0);
-    for (const g of games) {
-      if (!fixedWeeks.has(g.week)) continue;
-      homeCount.set(g.homeTeamId, (homeCount.get(g.homeTeamId) ?? 0) + 1);
+    for (const week of [1, 3, 5]) {
+      expect(games.filter((g) => g.week === week)).toHaveLength(72);
     }
-    for (const t of teams) expect(homeCount.get(t.id)).toBe(4);
   });
 });

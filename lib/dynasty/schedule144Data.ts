@@ -35,20 +35,6 @@ export async function buildSchedule144Input(
     priorHeadToHead.set(pairKey(g.awayTeamId, g.homeTeamId), winnerId);
   }
 
-  // The most recent PAST division/conference meeting's host for every team
-  // pair, across this dynasty's WHOLE history (not just last season) --
-  // biases host alternation. Processed oldest-to-newest so the most recent
-  // meeting is what survives in the map.
-  const allConfGames = await prisma.game.findMany({
-    where: { round: "REGULAR", week: { in: DIVISION_OR_CONFERENCE_WEEKS }, played: true, season: { dynastyId } },
-    include: { season: true },
-    orderBy: { season: { number: "asc" } },
-  });
-  const priorMeetingHost = new Map<string, string>();
-  for (const g of allConfGames) {
-    priorMeetingHost.set(pairKey(g.awayTeamId, g.homeTeamId), g.homeTeamId);
-  }
-
   // Career week-5 home-game count per conference, across this dynasty's
   // whole history -- the fewest-hosts-so-far conference gets the home game
   // next time it's paired in week 5.
@@ -67,7 +53,6 @@ export async function buildSchedule144Input(
     priorHeadToHead,
     startingPrestige: new Map(realTeams.map((t) => [t.id, t.startingPrestige ?? 0])),
     currentSeasonPrestige: currentSeasonPrestigeByTeamId,
-    priorMeetingHost,
     week5HistoricalHostCounts,
   };
 }

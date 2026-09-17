@@ -10,8 +10,8 @@ import {
 } from "@/lib/sim/roster";
 import { runPositionMarket, type TeamNeed, type TransferCandidate } from "@/lib/sim/recruiting";
 import { CONFERENCE_BONUS_MEGA144, conferenceRankBonus, rankConferencesByWins, updatePrestige } from "@/lib/sim/prestige";
-import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
-import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
+import { generateRegularSeasonSchedule, type PriorStanding } from "@/lib/sim/schedule";
+import { generateRegularSeasonSchedule144, type ScheduleTeam144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
 import { recomputeRankings } from "./simulateWeek";
 import { buildSchedule144Input } from "./schedule144Data";
@@ -280,11 +280,14 @@ export async function runOffseason(dynastyId: string) {
   // until week 1 itself is played.
   await recomputeRankings(nextSeason.id);
 
-  const scheduleTeams: ScheduleTeam[] = realTeams.map((t) => ({
+  // `rivalrySlot` is MEGA144-only (null for CLASSIC teams, harmlessly
+  // defaulted here since CLASSIC's own schedule generator never reads it).
+  const scheduleTeams: ScheduleTeam144[] = realTeams.map((t) => ({
     id: t.id,
     name: t.name,
     conferenceCode: t.conference.code,
     divisionCode: t.division.code,
+    rivalrySlot: t.rivalrySlot ?? 0,
   }));
   const games =
     ruleset === "MEGA144"

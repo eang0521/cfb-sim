@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db/client";
 import { bootstrapDynastyRosters, bootstrapInitialRoster, teamRatings } from "@/lib/sim/roster";
-import { generateRegularSeasonSchedule, type PriorStanding, type ScheduleTeam } from "@/lib/sim/schedule";
-import { generateRegularSeasonSchedule144 } from "@/lib/sim/schedule144";
+import { generateRegularSeasonSchedule, type PriorStanding } from "@/lib/sim/schedule";
+import { generateRegularSeasonSchedule144, type ScheduleTeam144 } from "@/lib/sim/schedule144";
 import { getOrCreateFcsTeam } from "./fcsTeam";
 import { recomputeRankings } from "./simulateWeek";
 
@@ -105,11 +105,14 @@ export async function createDynasty(name: string, ruleset: Ruleset, ownerId: str
   // no rank at all, matching how a real preseason poll works.
   await recomputeRankings(season.id);
 
-  const scheduleTeams: ScheduleTeam[] = realTeams.map((t) => ({
+  // `rivalrySlot` is MEGA144-only (null for CLASSIC teams, harmlessly
+  // defaulted here since CLASSIC's own schedule generator never reads it).
+  const scheduleTeams: ScheduleTeam144[] = realTeams.map((t) => ({
     id: t.id,
     name: t.name,
     conferenceCode: t.conference.code,
     divisionCode: t.division.code,
+    rivalrySlot: t.rivalrySlot ?? 0,
   }));
 
   const games =
@@ -119,7 +122,6 @@ export async function createDynasty(name: string, ruleset: Ruleset, ownerId: str
           priorHeadToHead: new Map(),
           startingPrestige: startingPrestigeByTeamId,
           currentSeasonPrestige: startingPrestigeByTeamId,
-          priorMeetingHost: new Map(),
           week5HistoricalHostCounts: new Map(),
         })
       : generateRegularSeasonSchedule(scheduleTeams, fcsTeam.id, 1, priorStandings);

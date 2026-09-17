@@ -45,6 +45,13 @@ model Team {
   divisionId     String
   historicScore  Float?   // CLASSIC only: fixed historical-strength input (TeamPlan.Score), needs scalePrestige()
   startingPrestige Float? // MEGA144 only: given directly, used as-is (no scaling)
+  // MEGA144 only: this team's letter (A-L, stored as 0-11) within its
+  // conference's user-given rivalry order -- first-listed team in a
+  // conference's first division is 0/A, ..., last team in its second
+  // division is 11/L. Drives lib/sim/schedule144.ts's C_TABLE/D_TABLE
+  // lookups and the fixed DR rivalry pairing (always consecutive slots:
+  // 0-1, 2-3, ...). Not reset per division -- see that file's doc comment.
+  rivalrySlot    Int?
   conference     Conference @relation(fields: [conferenceId], references: [id])
   division       Division   @relation(fields: [divisionId], references: [id])
   players        Player[]
