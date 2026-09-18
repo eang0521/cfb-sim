@@ -45,6 +45,13 @@
 // consecutive slots 0-1/2-3/4-5 (and 6-7/8-9/10-11) -- is always week 12.
 // Host alternates by season parity (every pairing has an odd/even variant).
 //
+// The tables above only guarantee a team's home/away split across its 8
+// division+conference games is within +/-1 of 4 for a given season (exactly
+// 4-4 over any two consecutive seasons). balanceHomeAway144, below, then
+// rebalances each conference's slate to exact 4-4 EVERY season by flipping
+// a minimal chain of games (never changing who plays whom, and never
+// touching week 12's rivalry host).
+//
 // C_TABLE (weeks 7/9/11): its 3 categories (C1-C3) are the cross-division
 // pairings; each has 4 seasonal variants (the sheet's "(k/4)" columns) that
 // together give a team all 6 of its cross-division opponents over a
@@ -231,8 +238,83 @@ function rankWithinConference144(confTeams: ScheduleTeam[], input: Schedule144In
   });
 }
 
+// The D-table's round-robin only guarantees each team 2 or 3 home division
+// games in a given season (see D_TABLE's doc comment), so the 8 division +
+// non-division-conference games straight out of the tables land a team on
+// 3, 4, or 5 home games -- balanced to exactly 8/8 over any two consecutive
+// seasons, but not exactly 4/4 within one. This rebalances a single
+// conference's 8-game slate to exact 4-4 for every team, WITHOUT changing
+// who plays whom: it only flips a game's home/away assignment, by moving a
+// "home credit" from a surplus team (>4 home games) to a deficit team (<4)
+// along a chain of currently-unflipped games, so every team in between the
+// chosen chain's endpoints nets zero change. Week 12 (the fixed DR rivalry)
+// is deliberately excluded from the flip pool, so its season-parity host
+// alternation always stays intact -- only weeks 4/6/7/8/9/10/11 are
+// eligible. Deterministic: always walks `games`/`teamIds` in the same fixed
+// order, so the same season produces the same result every time.
+function balanceHomeAway144(games: ScheduledGame[], teamIds: string[]): void {
+  const flippable = games.filter((g) => g.week !== 12);
+  const homeCount = new Map<string, number>(teamIds.map((id) => [id, 0]));
+  for (const g of games) homeCount.set(g.homeTeamId, (homeCount.get(g.homeTeamId) ?? 0) + 1);
+
+  for (const startId of teamIds) {
+    while ((homeCount.get(startId) ?? 0) > 4) {
+      const path = findCreditTransferPath(startId, flippable, homeCount);
+      for (const g of path) {
+        const oldHome = g.homeTeamId;
+        const oldAway = g.awayTeamId;
+        g.homeTeamId = oldAway;
+        g.awayTeamId = oldHome;
+        homeCount.set(oldHome, homeCount.get(oldHome)! - 1);
+        homeCount.set(oldAway, homeCount.get(oldAway)! + 1);
+      }
+    }
+  }
+}
+
+// BFS over the "credit transfer" graph: a directed edge cur -> g.awayTeamId
+// exists for every currently-unflipped game where cur is home (flipping it
+// would move 1 home credit from cur to that away team). Returns the chain
+// of games to flip to move a credit from `start` to the first reachable
+// team under 4 home games -- interior teams on the chain are entered via a
+// credit gain and leave via a credit loss, netting zero.
+function findCreditTransferPath(
+  start: string,
+  flippable: ScheduledGame[],
+  homeCount: Map<string, number>
+): ScheduledGame[] {
+  const visited = new Set<string>([start]);
+  const parentGame = new Map<string, ScheduledGame>();
+  const parentTeam = new Map<string, string>();
+  const queue: string[] = [start];
+
+  while (queue.length > 0) {
+    const cur = queue.shift()!;
+    if (cur !== start && (homeCount.get(cur) ?? 0) < 4) {
+      const path: ScheduledGame[] = [];
+      let node = cur;
+      while (parentGame.has(node)) {
+        path.push(parentGame.get(node)!);
+        node = parentTeam.get(node)!;
+      }
+      return path.reverse();
+    }
+    for (const g of flippable) {
+      if (g.homeTeamId !== cur) continue;
+      const next = g.awayTeamId;
+      if (visited.has(next)) continue;
+      visited.add(next);
+      parentGame.set(next, g);
+      parentTeam.set(next, cur);
+      queue.push(next);
+    }
+  }
+  throw new Error(`balanceHomeAway144: no reachable deficit team found from ${start}`);
+}
+
 // Weeks 4/6/8/10/12 (division) + 7/9/11 (non-division conference), built
-// independently per conference straight from the two lookup tables above.
+// independently per conference straight from the two lookup tables above,
+// then rebalanced (see balanceHomeAway144) to exact 4-4 home/away.
 function divisionAndConferenceWeeks144(teams: ScheduleTeam144[], seasonNumber: number): ScheduledGame[] {
   const games: ScheduledGame[] = [];
   const byConference = new Map<string, ScheduleTeam144[]>();
@@ -248,28 +330,32 @@ function divisionAndConferenceWeeks144(teams: ScheduleTeam144[], seasonNumber: n
   for (const confTeams of byConference.values()) {
     const bySlot = new Map(confTeams.map((t) => [t.rivalrySlot, t]));
     const teamAt = (slot: number) => bySlot.get(slot)!;
+    const confGames: ScheduledGame[] = [];
 
     for (const [week, offset] of D_WEEK_OFFSETS) {
       const category = `D${mod(T - offset, 4) + 1}` as keyof typeof D_TABLE;
       const pairs = isOddSeason ? D_TABLE[category].odd : D_TABLE[category].even;
       for (const [awaySlot, homeSlot] of pairs) {
-        games.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
+        confGames.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
       }
     }
 
     // Week 12: always the fixed rivalry pairing (DR), host by season parity.
     const drPairs = isOddSeason ? D_TABLE.DR.odd : D_TABLE.DR.even;
     for (const [awaySlot, homeSlot] of drPairs) {
-      games.push({ week: 12, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
+      confGames.push({ week: 12, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
     }
 
     for (const [week, offset] of C_WEEK_OFFSETS) {
       const category = `C${mod(seasonNumber + offset, 3) + 1}` as keyof typeof C_TABLE;
       const pairs = C_TABLE[category][cVariantIndex];
       for (const [awaySlot, homeSlot] of pairs) {
-        games.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
+        confGames.push({ week, awayTeamId: teamAt(awaySlot).id, homeTeamId: teamAt(homeSlot).id });
       }
     }
+
+    balanceHomeAway144(confGames, confTeams.map((t) => t.id));
+    games.push(...confGames);
   }
 
   return games;

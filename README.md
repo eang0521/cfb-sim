@@ -134,9 +134,11 @@ that ruleset's teams.
   (alternating by season parity) applies, are both season-number formulas. Weeks 7/9/11 are
   non-division conference games (`C_TABLE`'s 3 categories, each with 4 seasonal variants that
   together cover a team's other 6 conference-mates over a 4-season cycle); again, which category
-  lands on which week is a season-number formula. Home/away balances to within 1 of the ideal 4 in
-  any single season, and exactly 4-4 over any two consecutive seasons (verified directly, not
-  independently guaranteed the way it was under an earlier from-scratch scheme).
+  lands on which week is a season-number formula. The tables alone only balance home/away to
+  within 1 of the ideal 4 in a single season (exactly 8 home / 8 away over any two consecutive
+  seasons); a rebalancing pass then tightens this to exactly 4 home / 4 away every single season,
+  by flipping a minimal chain of games' host/visitor (never changing who plays whom, and never
+  touching week 12's rivalry host, so its season-parity alternation stays intact).
 - **Weeks 1/3/5** are a cross-conference block schedule: the 12 conferences are shuffled into a
   fresh order every season, Week 1 pairs them (1v2, 3v4, ..., 11v12) and Week 3 shifts the pairing
   by one (2v3, 4v5, ..., 12v1) -- between the two, every conference hosts exactly once and travels
