@@ -55,7 +55,12 @@ function winOddsLabel(
     g.neutralSite,
     g.id
   );
-  return `${Math.round(awayWinPct * 100)}%-${Math.round(homeWinPct * 100)}%`;
+  // Round independently rounds away/home to the nearest percent can land on
+  // 101% or 99% total (e.g. 50.5%/49.5% both round up to 51%/50%) -- round
+  // one side, then derive the other from 100 instead of rounding both, so
+  // they always sum to exactly 100.
+  const awayPct = Math.round(awayWinPct * 100);
+  return `${awayPct}%-${100 - awayPct}%`;
 }
 
 // Rank = as of entering the week (frozen once played); record = as of right

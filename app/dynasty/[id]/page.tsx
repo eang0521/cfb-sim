@@ -53,7 +53,7 @@ export default async function DynastyPage({
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-16">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3">
         <div>
           <Link href="/" className="text-sm text-zinc-500 hover:underline">
             &larr; All Dynasties
@@ -63,7 +63,7 @@ export default async function DynastyPage({
             Season {season.number} &middot; {season.status}
           </p>
         </div>
-        <nav className="flex gap-3 text-sm">
+        <nav className="flex flex-wrap gap-x-3 gap-y-1 border-y border-zinc-200 py-2 text-sm">
           <Link href={`/dynasty/${dynasty.id}/standings`} className="hover:underline">
             Standings
           </Link>
@@ -88,7 +88,7 @@ export default async function DynastyPage({
           <Link href={`/dynasty/${dynasty.id}/players`} className="hover:underline">
             Players
           </Link>
-          <Link href="/settings" className="hover:underline">
+          <Link href="/settings" className="ml-auto hover:underline">
             Settings
           </Link>
         </nav>
