@@ -14,7 +14,7 @@ export interface TeamStatsRow {
   defRating: number;
 }
 
-type SortKey = "team" | "conference" | "division" | "prestige" | "offense" | "defense";
+type SortKey = "team" | "conference" | "division" | "prestige" | "offense" | "defense" | "total";
 type Direction = "asc" | "desc";
 interface SortEntry {
   key: SortKey;
@@ -28,6 +28,7 @@ const COLUMN_LABEL: Record<SortKey, string> = {
   prestige: "Prestige",
   offense: "Offense",
   defense: "Defense",
+  total: "Total",
 };
 
 function keyValue(row: TeamStatsRow, key: SortKey): number | string {
@@ -44,6 +45,8 @@ function keyValue(row: TeamStatsRow, key: SortKey): number | string {
       return row.offRating;
     case "defense":
       return row.defRating;
+    case "total":
+      return row.offRating + row.defRating;
   }
 }
 
@@ -85,6 +88,7 @@ export function TeamStatsTable({ teams, dynastyId }: { teams: TeamStatsRow[]; dy
     { key: "prestige", label: "Prestige" },
     { key: "offense", label: "Offense" },
     { key: "defense", label: "Defense" },
+    { key: "total", label: "Total" },
   ];
 
   return (
@@ -146,7 +150,8 @@ export function TeamStatsTable({ teams, dynastyId }: { teams: TeamStatsRow[]; dy
                 <td className="py-1 pr-3">{t.divisionCode}</td>
                 <td className="py-1 pr-3 tabular-nums">{Math.round(t.prestige)}</td>
                 <td className="py-1 pr-3 tabular-nums">{t.offRating}</td>
-                <td className="py-1 tabular-nums">{t.defRating}</td>
+                <td className="py-1 pr-3 tabular-nums">{t.defRating}</td>
+                <td className="py-1 tabular-nums">{t.offRating + t.defRating}</td>
               </tr>
             ))}
           </tbody>
