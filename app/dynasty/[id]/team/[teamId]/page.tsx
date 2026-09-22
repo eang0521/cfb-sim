@@ -62,7 +62,7 @@ export default async function TeamPage({
                 <td className="py-1">{p.side}</td>
                 <td className="py-1">{p.classYear}</td>
                 <td className="py-1 tabular-nums">{p.ovr}</td>
-                <td className="py-1">{p.devMarker || "—"}</td>
+                <td className="py-1">{p.devMarker || " "}</td>
               </tr>
             ))}
           </tbody>

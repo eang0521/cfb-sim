@@ -134,7 +134,7 @@ export function PlayerDatabaseTable({ players, dynastyId }: { players: PlayerDat
                   </Link>
                 </td>
                 <td className="py-1 pr-3">{p.pos}</td>
-                <td className="py-1 pr-3">{p.devMarker || "—"}</td>
+                <td className="py-1 pr-3">{p.devMarker || " "}</td>
                 <td className="py-1 pr-3 tabular-nums">{p.ovr}</td>
                 <td className="py-1">{p.classYear}</td>
               </tr>
