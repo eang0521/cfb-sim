@@ -24,35 +24,23 @@ export default async function HomePage() {
         <h1 className="text-2xl font-bold">CFB Dynasty Sim</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Full recruiting &amp; aging engine, ported from the original spreadsheet -- play the
-          classic 72-team league or the 144-team mega-league.
+          144-team mega-league.
         </p>
       </div>
 
-      <form action={createDynastyAction} className="flex flex-col gap-2">
-        <div className="flex gap-2">
-          <input
-            name="name"
-            required
-            placeholder="New dynasty name"
-            className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
-          >
-            Start Dynasty
-          </button>
-        </div>
-        <fieldset className="flex gap-4 text-sm text-zinc-600">
-          <label className="flex items-center gap-1.5">
-            <input type="radio" name="ruleset" value="MEGA144" defaultChecked />
-            144 Teams
-          </label>
-          <label className="flex items-center gap-1.5">
-            <input type="radio" name="ruleset" value="CLASSIC" />
-            72 Teams (Classic)
-          </label>
-        </fieldset>
+      <form action={createDynastyAction} className="flex gap-2">
+        <input
+          name="name"
+          required
+          placeholder="New dynasty name"
+          className="flex-1 rounded border border-zinc-300 px-3 py-2 text-sm"
+        />
+        <button
+          type="submit"
+          className="rounded bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+        >
+          Start Dynasty
+        </button>
       </form>
 
       <div className="flex flex-col gap-2">

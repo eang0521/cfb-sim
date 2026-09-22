@@ -1,18 +1,19 @@
 // The transfer-portal / HS-recruiting market that fills every open roster
 // slot each offseason. Supplied directly (not from the workbook):
 //
-//   Team Value  = team's (post-update) prestige, ties broken by last
-//                 season's wins (higher wins ranks first)
+//   Team Value  = team's (post-update) prestige + rand()*50, ties broken by
+//                 last season's wins (higher wins ranks first)
 //   Player Value = player's current OVR * (rand()+1)   [uniform 1x-2x]
 //
 // Teams needing this position group are ranked by Team Value, pool players
 // (transfers out of other teams + fresh HS recruits) are ranked by Player
 // Value, and the two ranked lists are paired 1:1 — highest Team Value gets
-// the highest Player Value, and so on down the list. Team Value is
-// deliberately NOT randomized (it used to add rand()*25) so that a team's
-// prestige/record reliably determines its recruiting pull -- good programs
-// keep landing the better talent instead of occasionally losing out to
-// random luck.
+// the highest Player Value, and so on down the list. Team Value's jitter is
+// redrawn independently for every team AND every call (this function is
+// invoked once per position group each offseason) -- so the ranking isn't
+// just noisy, it's noisy differently per position: a team a few prestige
+// points behind another can easily outrank it for one position (say LB)
+// while still trailing for another (say QB) in the very same offseason.
 //
 // Market ranking uses each player's CURRENT OVR (a transfer's known ability,
 // a recruit's raw HS rating) -- development happens only once a player is
@@ -72,8 +73,8 @@ export function runPositionMarket(
   ];
 
   const rankedTeams = teamsNeeding
-    .slice()
-    .sort((a, b) => b.prestige - a.prestige || b.priorWins - a.priorWins);
+    .map((t) => ({ ...t, marketValue: t.prestige + rand() * 50 }))
+    .sort((a, b) => b.marketValue - a.marketValue || b.priorWins - a.priorWins);
 
   const rankedPool = pool
     .map((entry) => ({ ...entry, rankedOvr: entry.player.ovr, value: entry.player.ovr * (rand() + 1) }))

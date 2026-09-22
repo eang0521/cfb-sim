@@ -18,8 +18,7 @@ function player(overrides: Partial<RosterPlayer> = {}): RosterPlayer {
 }
 
 describe("runPositionMarket", () => {
-  it("pairs the highest team value with the highest player value, deterministically by prestige alone", () => {
-    // Team Value has no randomness, so this holds regardless of `rand`.
+  it("pairs the highest team value with the highest player value, by prestige alone when rand is 0", () => {
     const teams: TeamNeed[] = [
       { teamId: "low", prestige: 5, priorWins: 0 },
       { teamId: "high", prestige: 25, priorWins: 0 },
@@ -52,6 +51,26 @@ describe("runPositionMarket", () => {
     const byTeam = new Map(assignments.map((a) => [a.teamId, a]));
     expect(byTeam.get("more-wins")!.rankedOvr).toBe(20);
     expect(byTeam.get("fewer-wins")!.rankedOvr).toBe(5);
+  });
+
+  it("can let a lower-prestige team outrank a higher-prestige one via the team-value jitter (rand()*50)", () => {
+    const teams: TeamNeed[] = [
+      { teamId: "high-prestige", prestige: 20, priorWins: 0 },
+      { teamId: "low-prestige", prestige: 5, priorWins: 0 },
+    ];
+    const transfers: TransferCandidate[] = [
+      { teamId: "x", player: player({ ovr: 20, name: "Better" }) },
+      { teamId: "y", player: player({ ovr: 5, name: "Worse" }) },
+    ];
+    // First rand() call jitters "high-prestige" by 0 (+0), second jitters
+    // "low-prestige" by 50 (+50) -- enough to leapfrog a 15-point prestige
+    // gap. Remaining calls (player-value pairing) return 0.
+    let call = 0;
+    const rand = () => (call++ === 1 ? 1 : 0);
+    const assignments = runPositionMarket("QB", 2, teams, transfers, 0, rand);
+    const byTeam = new Map(assignments.map((a) => [a.teamId, a]));
+    expect(byTeam.get("low-prestige")!.rankedOvr).toBe(20);
+    expect(byTeam.get("high-prestige")!.rankedOvr).toBe(5);
   });
 
   it("returns nothing when no team needs the position", () => {
