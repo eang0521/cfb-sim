@@ -42,6 +42,18 @@ export function possessionDie(rand: Rand = Math.random): number {
   return choose(randBetween(1, 6, rand), POSSESSION_DIE);
 }
 
+// Standard Box-Muller transform -- two independent U(0,1) draws collapsed
+// into a single N(mean, stdev) sample (only the cosine branch is used,
+// since one normal draw is all any caller here needs; the paired sine
+// branch is simply discarded). `rand()` returning exactly 0 would make
+// log(0) = -Infinity, so it's floored to Number.EPSILON first.
+export function normal(mean: number, stdev: number, rand: Rand = Math.random): number {
+  const u1 = Math.max(rand(), Number.EPSILON);
+  const u2 = rand();
+  const z = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return mean + stdev * z;
+}
+
 // BINOM.INV(trials, probability, rand) — smallest k such that the binomial
 // CDF at k is >= rand. Excel/Sheets' inverse-binomial function.
 export function binomInv(trials: number, probability: number, rand: Rand = Math.random): number {

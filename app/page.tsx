@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db/client";
 import { getMachineId } from "@/lib/dynasty/machineId";
 import { createDynastyAction } from "./actions";
+import { DeleteDynastyButton } from "./components/DeleteDynastyButton";
 
 // This is the only route with no dynamic segment, so Next.js will otherwise
 // try to statically prerender it (running the dynasty-list query at BUILD
@@ -54,16 +55,18 @@ export default async function HomePage() {
           <p className="text-sm text-zinc-400">No dynasties yet — start one above.</p>
         )}
         {dynasties.map((d) => (
-          <Link
+          <div
             key={d.id}
-            href={`/dynasty/${d.id}`}
             className="flex items-center justify-between rounded border border-zinc-200 px-4 py-3 hover:bg-zinc-50"
           >
-            <span className="font-medium">{d.name}</span>
-            <span className="text-sm text-zinc-500">
-              {d.ruleset === "MEGA144" ? "144 Teams" : "Classic"} &middot; Season {d.currentSeasonNumber}
-            </span>
-          </Link>
+            <Link href={`/dynasty/${d.id}`} className="flex flex-1 items-center justify-between">
+              <span className="font-medium">{d.name}</span>
+              <span className="mr-3 text-sm text-zinc-500">
+                {d.ruleset === "MEGA144" ? "144 Teams" : "Classic"} &middot; Season {d.currentSeasonNumber}
+              </span>
+            </Link>
+            <DeleteDynastyButton dynastyId={d.id} dynastyName={d.name} />
+          </div>
         ))}
       </div>
     </main>

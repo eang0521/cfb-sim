@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
 import { createDynasty, type Ruleset } from "@/lib/dynasty/createDynasty";
+import { deleteDynasty } from "@/lib/dynasty/deleteDynasty";
 import { assertOwnsDynasty } from "@/lib/dynasty/queries";
 import { getOrCreateMachineId } from "@/lib/dynasty/machineId";
 import { setShowWinOdds } from "@/lib/dynasty/settings";
@@ -25,6 +26,14 @@ export async function createDynastyAction(formData: FormData) {
   const ownerId = await getOrCreateMachineId();
   const dynasty = await createDynasty(name, ruleset, ownerId);
   redirect(`/dynasty/${dynasty.id}`);
+}
+
+export async function deleteDynastyAction(formData: FormData) {
+  const dynastyId = String(formData.get("dynastyId") ?? "");
+  await assertOwnsDynasty(dynastyId);
+  await deleteDynasty(dynastyId);
+  revalidatePath("/");
+  redirect("/");
 }
 
 // Stays on the week that was just played (rather than the dashboard's

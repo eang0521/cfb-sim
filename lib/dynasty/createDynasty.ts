@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db/client";
+import type { Rand } from "@/lib/sim/rng";
+import { normal } from "@/lib/sim/rng";
 import { bootstrapDynastyRosters, bootstrapInitialRoster, teamRatings } from "@/lib/sim/roster";
 import { generateRegularSeasonSchedule, type PriorStanding } from "@/lib/sim/schedule";
 import { generateRegularSeasonSchedule144, type ScheduleTeam144 } from "@/lib/sim/schedule144";
@@ -7,7 +9,7 @@ import { recomputeRankings } from "./simulateWeek";
 
 export type Ruleset = "CLASSIC" | "MEGA144";
 
-export async function createDynasty(name: string, ruleset: Ruleset, ownerId: string) {
+export async function createDynasty(name: string, ruleset: Ruleset, ownerId: string, rand: Rand = Math.random) {
   const teams = await prisma.team.findMany({ where: { ruleset }, include: { conference: true, division: true } });
   const fcsTeam = await getOrCreateFcsTeam(ruleset);
 
@@ -23,9 +25,19 @@ export async function createDynasty(name: string, ruleset: Ruleset, ownerId: str
 
   // No real "prior season" yet -- seed the rank-based non-conference games
   // off each team's initial (historical-strength-derived, or given-directly
-  // for MEGA144) prestige order within its own conference.
+  // for MEGA144) prestige order within its own conference. Every new
+  // league's starting prestige also gets its own one-time Normal(0, 4)
+  // jitter (rounded to the nearest integer) on top of that base value, so
+  // two dynasties never start with identically-ranked teams -- computed
+  // once here and reused everywhere below (roster generation, the
+  // persisted TeamSeason row, and the schedule input) instead of being
+  // re-derived, which would otherwise apply a DIFFERENT random jitter in
+  // each place.
   const startingPrestigeByTeamId = new Map<string, number>(
-    realTeams.map((t) => [t.id, ruleset === "MEGA144" ? (t.startingPrestige ?? 0) : scalePrestige(t.historicScore ?? 0)])
+    realTeams.map((t) => {
+      const base = ruleset === "MEGA144" ? (t.startingPrestige ?? 0) : scalePrestige(t.historicScore ?? 0);
+      return [t.id, base + Math.round(normal(0, 4, rand))];
+    })
   );
   const priorStandings: PriorStanding[] = Object.values(
     realTeams.reduce<Record<string, { teamId: string; prestige: number }[]>>((acc, t) => {
@@ -79,12 +91,7 @@ export async function createDynasty(name: string, ruleset: Ruleset, ownerId: str
       })),
     });
 
-    const prestige =
-      team.id === fcsTeam.id
-        ? 0
-        : ruleset === "MEGA144"
-          ? (team.startingPrestige ?? 0)
-          : scalePrestige(team.historicScore ?? 0);
+    const prestige = team.id === fcsTeam.id ? 0 : startingPrestigeByTeamId.get(team.id)!;
     const ratings = teamRatings(roster, prestige);
     await prisma.teamSeason.create({
       data: {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { binomInv, coinGeom, possessionDie, randBetween } from "./rng";
+import { binomInv, coinGeom, normal, possessionDie, randBetween } from "./rng";
 
 function seeded(sequence: number[]): () => number {
   let i = 0;
@@ -47,6 +47,36 @@ describe("possessionDie", () => {
     for (let i = 0; i < 500; i++) {
       expect(possessionDie(Math.random)).not.toBe(4);
     }
+  });
+});
+
+describe("normal", () => {
+  it("has a mean and stdev close to the requested parameters over many draws", () => {
+    const n = 20000;
+    let sum = 0;
+    let sumSq = 0;
+    for (let i = 0; i < n; i++) {
+      const v = normal(0, 4, Math.random);
+      sum += v;
+      sumSq += v ** 2;
+    }
+    const mean = sum / n;
+    const stdev = Math.sqrt(sumSq / n - mean ** 2);
+    expect(mean).toBeGreaterThan(-0.2);
+    expect(mean).toBeLessThan(0.2);
+    expect(stdev).toBeGreaterThan(3.8);
+    expect(stdev).toBeLessThan(4.2);
+  });
+
+  it("is deterministic for a fixed rand sequence", () => {
+    const a = normal(0, 4, seeded([0.3, 0.7]));
+    const b = normal(0, 4, seeded([0.3, 0.7]));
+    expect(a).toBe(b);
+  });
+
+  it("never throws for a rand() of exactly 0 (would otherwise log(0))", () => {
+    expect(() => normal(0, 4, seeded([0, 0.5]))).not.toThrow();
+    expect(Number.isFinite(normal(0, 4, seeded([0, 0.5])))).toBe(true);
   });
 });
 
