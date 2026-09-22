@@ -31,8 +31,13 @@ export function coinGeom(rand: Rand = Math.random): number {
   return n;
 }
 
-// Weighted d6 used for possession counts: CHOOSE(RANDBETWEEN(1,6),1,2,2,2,3,4)
-const POSSESSION_DIE = [1, 2, 2, 2, 3, 4];
+// Weighted d6 used for possession counts. Deliberately diverges from the
+// sheet's original CHOOSE(RANDBETWEEN(1,6),1,2,2,2,3,4) -- capping the top
+// face at 3 instead of 4 trims the high-possession tail, pulling expected
+// possessions per team down from 4*(14/6)~9.33 to 4*(13/6)~8.67 (~7% fewer)
+// and, downstream, shrinking average scores and score variance by roughly
+// that same ~7% without changing home-field advantage in relative terms.
+const POSSESSION_DIE = [1, 2, 2, 2, 3, 3];
 export function possessionDie(rand: Rand = Math.random): number {
   return choose(randBetween(1, 6, rand), POSSESSION_DIE);
 }

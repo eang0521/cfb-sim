@@ -36,10 +36,16 @@ describe("randBetween", () => {
 });
 
 describe("possessionDie", () => {
-  it("only produces values from the weighted table [1,2,2,2,3,4]", () => {
+  it("only produces values from the weighted table [1,2,2,2,3,3]", () => {
     for (let i = 0; i < 100; i++) {
       const v = possessionDie(Math.random);
-      expect([1, 2, 3, 4]).toContain(v);
+      expect([1, 2, 3]).toContain(v);
+    }
+  });
+
+  it("never produces a 4 (the top face was trimmed to 3)", () => {
+    for (let i = 0; i < 500; i++) {
+      expect(possessionDie(Math.random)).not.toBe(4);
     }
   });
 });

@@ -27,7 +27,8 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-// SeasonGen!V2 = 4x CHOOSE(RANDBETWEEN(1,6),1,2,2,2,3,4)
+// SeasonGen!V2 = 4x the weighted possession die (see possessionDie in
+// rng.ts for the die's own table and why it diverges from the sheet).
 function possessions(rand: Rand): number {
   return possessionDie(rand) + possessionDie(rand) + possessionDie(rand) + possessionDie(rand);
 }
