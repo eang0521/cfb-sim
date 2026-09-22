@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   agePlayer,
+  ageToRandomClassYear,
   bootstrapDynastyRosters,
   bootstrapInitialRoster,
   generateFreshmanClass,
@@ -27,6 +28,11 @@ function makePlayer(overrides: Partial<RosterPlayer> = {}): RosterPlayer {
     recruitedSeason: 1,
     ...overrides,
   };
+}
+
+function seeded(sequence: number[]): () => number {
+  let i = 0;
+  return () => sequence[i++ % sequence.length];
 }
 
 describe("generateFreshmanClass", () => {
@@ -121,6 +127,38 @@ describe("agePlayer", () => {
     const aged = agePlayer(freshman, Math.random)!;
     expect(aged.classYear).toBe("SO");
     expect(aged.ovr).toBeGreaterThanOrEqual(10);
+  });
+});
+
+describe("ageToRandomClassYear", () => {
+  it("discards a rolled senior who would have been a Star-dev junior, and retries", () => {
+    // Attempt 1's sequence deterministically rolls targetYearIndex=3 (SR)
+    // and forces walkDevTrait to hold at 3 (Star) through every step via
+    // d6=6 -- so at the SO->JR step, devTrait is 3 (an impossible senior:
+    // isEarlyDeparture would have already sent this player pro). growOvr's
+    // coinGeom draws are all fed r=0.1 (< 0.5 -> always 0), so ovr never
+    // moves and the whole attempt is otherwise inert except for proving it
+    // gets discarded. Attempt 2's single value (0.1) rolls targetYearIndex=0
+    // (FR) -- trivially valid (no growth steps at all) -- and must be what
+    // actually comes back, proving attempt 1 was retried rather than kept.
+    const perStep = [0.9, 0.1, 0.1, 0.1]; // d6=6 (holds dev=3), then 3x coinGeom=0
+    const attempt1 = [0.9, ...perStep, ...perStep, ...perStep]; // targetYearIndex roll + 3 steps
+    const attempt2 = [0.1]; // targetYearIndex roll -> 0 (FR)
+    const rand = seeded([...attempt1, ...attempt2]);
+
+    const result = ageToRandomClassYear(10, 3, rand);
+    expect(result).toEqual({ classYear: "FR", ovr: 10, devTrait: 3 });
+  });
+
+  it("still produces seniors over many random trials (the retry isn't excluding SR outright)", () => {
+    // Sanity check alongside the precise deterministic test above: retrying
+    // an invalid path shouldn't make SR unreachable, it should just require
+    // a junior-year devTrait that isn't 3 on whichever attempt succeeds.
+    const classYears = new Set<string>();
+    for (let i = 0; i < 500; i++) {
+      classYears.add(ageToRandomClassYear(10, 2, Math.random).classYear);
+    }
+    expect(classYears.has("SR")).toBe(true);
   });
 });
 
