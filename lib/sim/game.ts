@@ -1,5 +1,13 @@
 // Game simulation, ported from `SeasonGen` (the workbook's live per-game
 // calculator — columns V through AR for a single matchup).
+//
+// One deliberate departure from the sheet: each team's regulation score
+// isn't a single simulated trial -- it's the MEDIAN of 3 independent trials
+// (see simulateRegulationTrial/simulateRegulation), which damps the
+// variance of any one trial's dice without changing the underlying
+// possession-count/scoring-rate/FG-split mechanics. Overtime (only reached
+// if the two medians tie) is untouched -- still a single simulated
+// possession-by-possession OT, same as before.
 
 import { binomInv, possessionDie, type Rand } from "./rng";
 
@@ -38,23 +46,36 @@ function scoreRate(baseline: number, offense: number, defense: number): number {
 }
 
 interface RegulationResult {
-  poss: number;
   rate: number;
-  scores: number;
-  fgs: number;
   points: number;
 }
 
-function simulateRegulation(baseline: number, offense: number, defense: number, rand: Rand): RegulationResult {
+// One full independent trial through regulation: a possession count, a
+// score count off that possession count, and a field-goal/touchdown split
+// off that score count -- exactly what simulateRegulation used to compute
+// once per team. Now run 3x per team per game (see simulateRegulation) so a
+// single unlucky possession-count or FG/TD roll can't swing the final score
+// on its own.
+function simulateRegulationTrial(rate: number, rand: Rand): number {
   const poss = possessions(rand);
-  const rate = scoreRate(baseline, offense, defense);
   const scores = binomInv(poss, rate / 100, rand);
   // SeasonGen!Y2 = BINOM.INV(scores, CEILING(rate/4,1)/rate, rand) — fraction of
   // scores that are field goals rather than touchdowns.
   const fgProbability = Math.ceil(rate / 4) / rate;
   const fgs = binomInv(scores, fgProbability, rand);
-  const points = fgs * 3 + (scores - fgs) * 7;
-  return { poss, rate, scores, fgs, points };
+  return fgs * 3 + (scores - fgs) * 7;
+}
+
+// Not part of the ported workbook: takes 3 independent trials through
+// regulation for this team and uses their median point total as its actual
+// regulation score, damping the variance of any single trial's dice
+// (possession count, score count, FG/TD split) while still coming from the
+// exact same per-possession scoring mechanics.
+function simulateRegulation(baseline: number, offense: number, defense: number, rand: Rand): RegulationResult {
+  const rate = scoreRate(baseline, offense, defense);
+  const trials = [simulateRegulationTrial(rate, rand), simulateRegulationTrial(rate, rand), simulateRegulationTrial(rate, rand)];
+  const points = trials.slice().sort((a, b) => a - b)[1];
+  return { rate, points };
 }
 
 // One overtime possession: field-goal-only scoring uses the same rate/FG-split
