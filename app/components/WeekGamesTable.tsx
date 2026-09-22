@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatRank, formatRecord, gameSideDisplay, RANKED_CUTOFF, type StandingsSnapshot } from "@/app/gameDisplay";
 import { ROUND_LABEL } from "@/app/roundLabels";
 import { TeamLogo } from "@/app/components/TeamLogo";
+import { estimateWinProbability } from "@/lib/sim/winProbability";
 
 export interface WeekGamesTableGame {
   id: string;
@@ -37,6 +38,26 @@ function liveSnapshotFor(
   return { ...snapshot, rank: snapshot.playoffSeed };
 }
 
+// Estimated pre-game odds, formatted the same shape as a final score
+// ("away-home") so it drops into the same table cell -- null when either
+// side's current-season ratings aren't available (e.g. the FCS cupcake
+// opponent, which carries no TeamSeason row at all).
+function winOddsLabel(
+  g: WeekGamesTableGame,
+  standingsByTeamId: Map<string, StandingsSnapshot>
+): string | null {
+  const away = standingsByTeamId.get(g.awayTeam.id);
+  const home = standingsByTeamId.get(g.homeTeam.id);
+  if (!away || !home) return null;
+  const { awayWinPct, homeWinPct } = estimateWinProbability(
+    { offRating: away.offRating, defRating: away.defRating, powerElo: away.powerElo },
+    { offRating: home.offRating, defRating: home.defRating, powerElo: home.powerElo },
+    g.neutralSite,
+    g.id
+  );
+  return `${Math.round(awayWinPct * 100)}%-${Math.round(homeWinPct * 100)}%`;
+}
+
 // Rank = as of entering the week (frozen once played); record = as of right
 // after that specific game (falls back to the live record when unplayed).
 // Columns are real <table> cells so ranks/names/records/scores each line up
@@ -46,11 +67,13 @@ export function WeekGamesTable({
   standingsByTeamId,
   dynastyId,
   showBowlNames = false,
+  showWinOdds = false,
 }: {
   games: WeekGamesTableGame[];
   standingsByTeamId: Map<string, StandingsSnapshot>;
   dynastyId: string;
   showBowlNames?: boolean;
+  showWinOdds?: boolean;
 }) {
   // Sort by the best (lowest-numbered) visible rank in each matchup, so the
   // marquee games surface first; below that (or when neither team is
@@ -111,7 +134,9 @@ export function WeekGamesTable({
               <td className="py-1 pr-3 whitespace-nowrap tabular-nums text-zinc-500">{formatRecord(home)}</td>
               <td className="py-1 text-right tabular-nums text-zinc-600">
                 <Link href={`/dynasty/${dynastyId}/game/${g.id}`} className="hover:underline">
-                  {g.played ? `${g.awayScore}-${g.homeScore}${g.otPeriods ? ` (${g.otPeriods}OT)` : ""}` : "—"}
+                  {g.played
+                    ? `${g.awayScore}-${g.homeScore}${g.otPeriods ? ` (${g.otPeriods}OT)` : ""}`
+                    : (showWinOdds && winOddsLabel(g, standingsByTeamId)) || "—"}
                 </Link>
               </td>
             </tr>

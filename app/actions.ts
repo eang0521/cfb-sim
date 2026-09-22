@@ -6,9 +6,16 @@ import { prisma } from "@/lib/db/client";
 import { createDynasty, type Ruleset } from "@/lib/dynasty/createDynasty";
 import { assertOwnsDynasty } from "@/lib/dynasty/queries";
 import { getOrCreateMachineId } from "@/lib/dynasty/machineId";
+import { setShowWinOdds } from "@/lib/dynasty/settings";
 import { simulateWeek } from "@/lib/dynasty/simulateWeek";
 import { advancePostseason, type PostseasonStepResult } from "@/lib/dynasty/postseason";
 import { runOffseason } from "@/lib/dynasty/runOffseason";
+
+export async function updateSettingsAction(formData: FormData) {
+  await setShowWinOdds(formData.get("showWinOdds") === "on");
+  revalidatePath("/", "layout");
+  redirect("/settings");
+}
 
 export async function createDynastyAction(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();

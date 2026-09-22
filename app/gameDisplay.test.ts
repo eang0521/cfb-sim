@@ -3,7 +3,15 @@ import { formatRank, formatRecord, gameSideDisplay } from "./gameDisplay";
 
 describe("gameSideDisplay", () => {
   it("uses the persisted entering-rank and after-record for a played game", () => {
-    const result = gameSideDisplay(true, 7, 9, 2, { rank: 3, playoffSeed: null, wins: 20, losses: 0, powerElo: 100 });
+    const result = gameSideDisplay(true, 7, 9, 2, {
+      rank: 3,
+      playoffSeed: null,
+      wins: 20,
+      losses: 0,
+      powerElo: 100,
+      offRating: 50,
+      defRating: 50,
+    });
     expect(result).toEqual({ rank: 7, wins: 9, losses: 2 });
   });
 
@@ -14,6 +22,8 @@ describe("gameSideDisplay", () => {
       wins: 6,
       losses: 1,
       powerElo: 100,
+      offRating: 50,
+      defRating: 50,
     });
     expect(result).toEqual({ rank: 5, wins: 6, losses: 1 });
   });

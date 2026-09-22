@@ -12,6 +12,7 @@ import { ROUND_LABEL } from "@/app/roundLabels";
 import { WeekGamesTable } from "@/app/components/WeekGamesTable";
 import { SimulationBar } from "@/app/components/SimulationBar";
 import { TeamLogo } from "@/app/components/TeamLogo";
+import { getShowWinOdds } from "@/lib/dynasty/settings";
 
 export default async function DynastyPage({
   params,
@@ -38,6 +39,7 @@ export default async function DynastyPage({
 
   const weekGames = await getWeekGames(season.id, viewedWeek);
   const standingsByTeamId = await getStandingsSnapshotMap(season.id);
+  const showWinOdds = await getShowWinOdds();
 
   const canGoPrev = viewedWeek > 1;
   const canGoNext = viewedWeek < maxWeek;
@@ -86,6 +88,9 @@ export default async function DynastyPage({
           <Link href={`/dynasty/${dynasty.id}/players`} className="hover:underline">
             Players
           </Link>
+          <Link href="/settings" className="hover:underline">
+            Settings
+          </Link>
         </nav>
       </div>
 
@@ -130,6 +135,7 @@ export default async function DynastyPage({
             standingsByTeamId={standingsByTeamId}
             dynastyId={dynasty.id}
             showBowlNames={viewedWeek > 12}
+            showWinOdds={showWinOdds}
           />
         ) : (
           <p className="text-sm text-zinc-400">

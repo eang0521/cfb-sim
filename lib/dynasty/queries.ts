@@ -9,6 +9,8 @@ export interface StandingsSnapshot {
   wins: number;
   losses: number;
   powerElo: number;
+  offRating: number;
+  defRating: number;
 }
 
 // Every dynasty read/mutation funnels through here (or assertOwnsDynasty
@@ -45,15 +47,24 @@ export async function getStandings(seasonId: string) {
   return teamSeasons.filter((ts) => ts.team.name !== "FCS");
 }
 
-// A team-id -> {rank, wins, losses} snapshot of the CURRENT standings, used
-// as the display fallback for games that haven't been played yet (see
-// app/gameDisplay.ts).
+// A team-id -> {rank, wins, losses, ...} snapshot of the CURRENT standings,
+// used as the display fallback for games that haven't been played yet (see
+// app/gameDisplay.ts) and as the rating inputs for estimateWinProbability
+// (see lib/sim/winProbability.ts).
 export async function getStandingsSnapshotMap(seasonId: string): Promise<Map<string, StandingsSnapshot>> {
   const standings = await getStandings(seasonId);
   return new Map(
     standings.map((ts) => [
       ts.teamId,
-      { rank: ts.rank, playoffSeed: ts.playoffSeed, wins: ts.wins, losses: ts.losses, powerElo: ts.powerElo },
+      {
+        rank: ts.rank,
+        playoffSeed: ts.playoffSeed,
+        wins: ts.wins,
+        losses: ts.losses,
+        powerElo: ts.powerElo,
+        offRating: ts.offRating,
+        defRating: ts.defRating,
+      },
     ])
   );
 }

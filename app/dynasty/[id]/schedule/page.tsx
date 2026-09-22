@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getCurrentSeason, getAllGames, getStandingsSnapshotMap } from "@/lib/dynasty/queries";
 import { ROUND_LABEL } from "@/app/roundLabels";
 import { WeekGamesTable } from "@/app/components/WeekGamesTable";
+import { getShowWinOdds } from "@/lib/dynasty/settings";
 
 export default async function SchedulePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -11,6 +12,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
 
   const games = await getAllGames(season.id);
   const standingsByTeamId = await getStandingsSnapshotMap(season.id);
+  const showWinOdds = await getShowWinOdds();
   const byWeek = new Map<number, typeof games>();
   for (const g of games) {
     if (!byWeek.has(g.week)) byWeek.set(g.week, []);
@@ -38,6 +40,7 @@ export default async function SchedulePage({ params }: { params: Promise<{ id: s
             standingsByTeamId={standingsByTeamId}
             dynastyId={dynasty.id}
             showBowlNames={week > 12}
+            showWinOdds={showWinOdds}
           />
         </section>
       ))}
