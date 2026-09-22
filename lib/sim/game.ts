@@ -33,8 +33,15 @@ function possessions(rand: Rand): number {
 }
 
 // SeasonGen!W2 = MEDIAN(5,95, 47 + AwayOff - HomeDef)  [53 baseline for home]
-function scoreRate(baseline: number, offense: number, defense: number): number {
-  return clamp(baseline + offense - defense, 5, 95);
+// -- with the offense/defense gap's effect scaled up 50% (rounded away from
+// zero) on top of the sheet's original formula, since team ratings carry
+// more spread now that recruiting has its own per-position randomness (see
+// runPositionMarket's rand()*50 jitter) than they did when this 1:1 gap was
+// first tuned.
+export function scoreRate(baseline: number, offense: number, defense: number): number {
+  const gap = offense - defense;
+  const factor = Math.sign(gap) * Math.round(Math.abs(gap) * 1.5);
+  return clamp(baseline + factor, 5, 95);
 }
 
 interface RegulationResult {

@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { awayEloDelta, neutralEloDelta, simulateGame } from "./game";
+import { awayEloDelta, neutralEloDelta, scoreRate, simulateGame } from "./game";
+
+describe("scoreRate", () => {
+  it("scales the offense/defense gap by 1.5x, rounded away from zero", () => {
+    expect(scoreRate(53, 60, 50)).toBe(53 + 15); // gap 10 * 1.5 = 15 exactly
+    expect(scoreRate(47, 50, 60)).toBe(47 - 15); // gap -10 * 1.5 = -15 exactly
+    expect(scoreRate(53, 53, 50)).toBe(53 + 5); // gap 3 * 1.5 = 4.5 -> 5 (away from zero)
+    expect(scoreRate(47, 47, 50)).toBe(47 - 5); // gap -3 * 1.5 = -4.5 -> -5 (away from zero)
+  });
+
+  it("still clamps to [5, 95] after scaling", () => {
+    expect(scoreRate(53, 100, 0)).toBe(95);
+    expect(scoreRate(47, 0, 100)).toBe(5);
+  });
+
+  it("leaves the baseline untouched when offense equals defense", () => {
+    expect(scoreRate(53, 40, 40)).toBe(53);
+    expect(scoreRate(47, 40, 40)).toBe(47);
+  });
+});
 
 describe("simulateGame", () => {
   it("produces realistic college-football score ranges over many sims", () => {
