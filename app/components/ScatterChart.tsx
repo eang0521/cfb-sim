@@ -10,8 +10,8 @@ export interface ScatterDatum {
   y: number;
 }
 
-const WIDTH = 640;
-const HEIGHT = 400;
+const WIDTH = 560;
+const HEIGHT = 560;
 const MARGIN = { top: 16, right: 16, bottom: 40, left: 52 };
 const PLOT_WIDTH = WIDTH - MARGIN.left - MARGIN.right;
 const PLOT_HEIGHT = HEIGHT - MARGIN.top - MARGIN.bottom;
