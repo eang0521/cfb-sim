@@ -48,6 +48,7 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
           title="Defense vs. Offense"
           xLabel="Offense"
           yLabel="Defense"
+          equalScale
           points={rows.map((t): ScatterDatum => ({
             id: t.teamId,
             label: t.teamName,

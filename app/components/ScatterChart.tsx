@@ -59,24 +59,50 @@ export function ScatterChart({
   xLabel,
   yLabel,
   points,
+  equalScale = false,
 }: {
   title: string;
   xLabel: string;
   yLabel: string;
   points: ScatterDatum[];
+  // When the two axes measure the same underlying quantity (e.g. offense
+  // and defense both 0-100ish ratings), force them to share one domain AND
+  // one square plot region, so a gap of N looks identical on both axes
+  // instead of each axis independently stretching to fill its own space.
+  equalScale?: boolean;
 }) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  const [xMin, xMax] = domain(points.map((p) => p.x));
-  const [yMin, yMax] = domain(points.map((p) => p.y));
-  const scaleX = (x: number) => MARGIN.left + ((x - xMin) / (xMax - xMin)) * PLOT_WIDTH;
-  const scaleY = (y: number) => MARGIN.top + PLOT_HEIGHT - ((y - yMin) / (yMax - yMin)) * PLOT_HEIGHT;
+  const [xMin, xMax] = equalScale
+    ? domain([...points.map((p) => p.x), ...points.map((p) => p.y)])
+    : domain(points.map((p) => p.x));
+  const [yMin, yMax] = equalScale ? [xMin, xMax] : domain(points.map((p) => p.y));
+
+  // The plot region is square-scaled by clamping both dimensions to the
+  // smaller of the two and centering it in the available margin box --
+  // otherwise a "square chart" would still stretch pixels-per-unit
+  // differently on each axis, since the left/right margins aren't the same
+  // width as the top/bottom ones.
+  const plotSize = equalScale ? Math.min(PLOT_WIDTH, PLOT_HEIGHT) : null;
+  const plotLeft = equalScale ? MARGIN.left + (PLOT_WIDTH - plotSize!) / 2 : MARGIN.left;
+  const plotTop = equalScale ? MARGIN.top + (PLOT_HEIGHT - plotSize!) / 2 : MARGIN.top;
+  const plotW = equalScale ? plotSize! : PLOT_WIDTH;
+  const plotH = equalScale ? plotSize! : PLOT_HEIGHT;
+
+  const scaleX = (x: number) => plotLeft + ((x - xMin) / (xMax - xMin)) * plotW;
+  const scaleY = (y: number) => plotTop + plotH - ((y - yMin) / (yMax - yMin)) * plotH;
 
   const xTicks = niceTicks(xMin, xMax);
   const yTicks = niceTicks(yMin, yMax);
 
   const plotted = points.map((p) => ({ ...p, px: scaleX(p.x), py: scaleY(p.y) }));
   const hovered = plotted.find((p) => p.id === hoveredId) ?? null;
+  // Two teams with the exact same x/y land on the exact same dot -- group by
+  // the underlying data value (not the rounded pixel position) so the
+  // tooltip lists every team sharing that point, not just whichever one's
+  // hit-circle happened to be on top.
+  const hoveredGroup = hovered ? plotted.filter((p) => p.x === hovered.x && p.y === hovered.y) : [];
+  const hoveredIds = new Set(hoveredGroup.map((p) => p.id));
   // Flip the tooltip below the dot instead of above when there isn't room
   // above it, so it never gets clipped off the top of the chart.
   const tooltipBelow = hovered !== null && hovered.py - MARGIN.top < 70;
@@ -90,8 +116,8 @@ export function ScatterChart({
           {yTicks.map((t) => (
             <line
               key={`gy-${t}`}
-              x1={MARGIN.left}
-              x2={WIDTH - MARGIN.right}
+              x1={plotLeft}
+              x2={plotLeft + plotW}
               y1={scaleY(t)}
               y2={scaleY(t)}
               stroke={GRIDLINE}
@@ -103,8 +129,8 @@ export function ScatterChart({
               key={`gx-${t}`}
               x1={scaleX(t)}
               x2={scaleX(t)}
-              y1={MARGIN.top}
-              y2={HEIGHT - MARGIN.bottom}
+              y1={plotTop}
+              y2={plotTop + plotH}
               stroke={GRIDLINE}
               strokeWidth={1}
             />
@@ -112,7 +138,7 @@ export function ScatterChart({
 
           {/* Axis tick labels. */}
           {yTicks.map((t) => (
-            <text key={`yl-${t}`} x={MARGIN.left - 8} y={scaleY(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={MUTED}>
+            <text key={`yl-${t}`} x={plotLeft - 8} y={scaleY(t)} dy="0.32em" textAnchor="end" fontSize={11} fill={MUTED}>
               {t}
             </text>
           ))}
@@ -120,7 +146,7 @@ export function ScatterChart({
             <text
               key={`xl-${t}`}
               x={scaleX(t)}
-              y={HEIGHT - MARGIN.bottom + 16}
+              y={plotTop + plotH + 16}
               textAnchor="middle"
               fontSize={11}
               fill={MUTED}
@@ -158,7 +184,7 @@ export function ScatterChart({
               key={p.id}
               cx={p.px}
               cy={p.py}
-              r={p.id === hoveredId ? 6 : 4}
+              r={hoveredIds.has(p.id) ? 6 : 4}
               fill={DOT_COLOR}
               stroke={SURFACE}
               strokeWidth={2}
@@ -185,18 +211,34 @@ export function ScatterChart({
 
         {hovered && (
           <div
-            className="pointer-events-none absolute z-10 flex items-center gap-1.5 rounded border border-zinc-200 bg-white px-2 py-1 text-xs shadow-sm"
+            className="pointer-events-none absolute z-10 rounded border border-zinc-200 bg-white px-2 py-1 text-xs shadow-sm"
             style={{
               left: `${(hovered.px / WIDTH) * 100}%`,
               top: `${(hovered.py / HEIGHT) * 100}%`,
               transform: `translate(-50%, ${tooltipBelow ? "12px" : "calc(-100% - 12px)"})`,
             }}
           >
-            <TeamLogo name={hovered.label} className="h-4 w-4" />
-            <span className="font-semibold">{hovered.label}</span>
-            <span className="text-zinc-500">
-              {xLabel} {hovered.x} &middot; {yLabel} {hovered.y}
-            </span>
+            {hoveredGroup.length === 1 ? (
+              <div className="flex items-center gap-1.5">
+                <TeamLogo name={hovered.label} className="h-4 w-4" />
+                <span className="font-semibold">{hovered.label}</span>
+                <span className="text-zinc-500">
+                  {xLabel} {hovered.x} &middot; {yLabel} {hovered.y}
+                </span>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1">
+                {hoveredGroup.map((p) => (
+                  <div key={p.id} className="flex items-center gap-1.5">
+                    <TeamLogo name={p.label} className="h-4 w-4" />
+                    <span className="font-semibold">{p.label}</span>
+                  </div>
+                ))}
+                <span className="text-zinc-500">
+                  {xLabel} {hovered.x} &middot; {yLabel} {hovered.y}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
