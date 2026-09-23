@@ -21,7 +21,7 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
   }));
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-8 px-6 py-16">
+    <main className="mx-auto flex w-full max-w-4xl flex-1 flex-col gap-8 px-6 py-16">
       <div>
         <Link href={`/dynasty/${dynasty.id}`} className="text-sm text-zinc-500 hover:underline">
           &larr; {dynasty.name}
@@ -32,7 +32,7 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
 
       <TeamStatsTable teams={rows} dynastyId={dynasty.id} />
 
-      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+      <div className="flex flex-col gap-10">
         <ScatterChart
           title="Overall vs. Prestige"
           xLabel="Prestige"
