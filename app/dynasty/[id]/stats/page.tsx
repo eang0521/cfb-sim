@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCurrentSeason, getStandings } from "@/lib/dynasty/queries";
 import { TeamStatsTable, type TeamStatsRow } from "@/app/components/TeamStatsTable";
+import { ScatterChart, type ScatterDatum } from "@/app/components/ScatterChart";
 
 export default async function StatsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -30,6 +31,31 @@ export default async function StatsPage({ params }: { params: Promise<{ id: stri
       </div>
 
       <TeamStatsTable teams={rows} dynastyId={dynasty.id} />
+
+      <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
+        <ScatterChart
+          title="Overall vs. Prestige"
+          xLabel="Prestige"
+          yLabel="Overall"
+          points={rows.map((t): ScatterDatum => ({
+            id: t.teamId,
+            label: t.teamName,
+            x: t.prestige,
+            y: t.offRating + t.defRating,
+          }))}
+        />
+        <ScatterChart
+          title="Defense vs. Offense"
+          xLabel="Offense"
+          yLabel="Defense"
+          points={rows.map((t): ScatterDatum => ({
+            id: t.teamId,
+            label: t.teamName,
+            x: t.offRating,
+            y: t.defRating,
+          }))}
+        />
+      </div>
     </main>
   );
 }
