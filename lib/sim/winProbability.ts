@@ -4,7 +4,7 @@
 
 import { simulateGame, type TeamGameInput } from "./game";
 
-const DEFAULT_TRIALS = 400;
+const DEFAULT_TRIALS = 500;
 
 // FNV-1a-ish string hash -> 32-bit seed, so a given game always seeds the
 // same private PRNG. Combined with a deterministic `trials` count, the same
